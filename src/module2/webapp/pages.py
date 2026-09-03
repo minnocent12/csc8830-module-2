@@ -12,10 +12,14 @@ Theory                Phase 4
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import cv2
 import numpy as np
 import streamlit as st
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_DOCS_DIR = _REPO_ROOT / "docs"
 
 from module2 import calibration as calib
 from module2.dimension_estimation import estimate_width_height
@@ -317,7 +321,13 @@ def _validation_page() -> None:
 
 
 def _theory_page() -> None:
-    placeholder_page("Two-Camera Projection Theory", "Phase 4")
+    st.header("Two-Camera Projection Theory")
+    doc = _DOCS_DIR / "theory_two_camera_projection.md"
+    if not doc.is_file():
+        st.error(f"Theory document not found: {doc}")
+        return
+    st.caption(f"Source: `docs/{doc.name}`")
+    st.markdown(doc.read_text(encoding="utf-8"))
 
 
 def get_pages() -> list[PageSpec]:
