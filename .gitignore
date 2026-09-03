@@ -1,0 +1,21 @@
+# Python / build
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+
+# Streamlit
+.streamlit/
+
+# OS
+.DS_Store
+
+# User-collected experiment images: keep the directories, ignore their contents
+data/calibration_images/*
+data/experiments/*
+!data/calibration_images/.gitkeep
+!data/experiments/.gitkeep
