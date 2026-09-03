@@ -27,6 +27,11 @@ Working from the `Assignments/` workspace root instead? Prefix paths with `Modul
 `pip install -e "./Module_2[dev]"`, `streamlit run Module_2/app.py`,
 `pytest -q Module_2/tests`.
 
+`app.py` and the `scripts/` entry points add `src/` to the path themselves, so they run from
+a clone even if the editable install is skipped or its `.pth` is not honoured (seen on some
+Python 3.14 builds); only the third-party packages in `pyproject.toml` are strictly
+required. `pytest` finds the package via `pythonpath = ["src"]` in `pyproject.toml`.
+
 ## Layout
 
 ```
