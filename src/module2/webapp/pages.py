@@ -21,6 +21,12 @@ from module2 import calibration as calib
 from module2.dimension_estimation import estimate_width_height
 from module2.io_utils import decode_image_bgr
 from module2.units import metres_to_mm
+from module2.validation import (
+    compute_errors,
+    parse_measurements_text,
+    row_error_columns,
+    to_markdown_table,
+)
 from module2.webapp._page import PageSpec
 from module2.webapp.ui import pending_experiment_banner, placeholder_page
 
@@ -225,7 +231,89 @@ def _estimation_page() -> None:
 
 
 def _validation_page() -> None:
-    placeholder_page("Validation Analysis", "Phase 3")
+    st.header("Validation Analysis")
+    st.write(
+        "Analyse the 20-trial measurement CSV: per-row errors plus width / height / combined "
+        "statistics. See `docs/validation_protocol.md`. Rows with object-plane depth "
+        "≤ 2 m, non-positive ground truth, or missing points are rejected."
+    )
+
+    csv_file = st.file_uploader("Measurements CSV (from measurements_template.csv)", type=["csv"])
+    calib_file = st.file_uploader("calibration.json", type=["json"])
+    if csv_file is None or calib_file is None:
+        pending_experiment_banner(
+            "Upload your filled measurements CSV and calibration.json. No data is present "
+            "until you collect the 20 real measurements."
+        )
+        return
+
+    try:
+        rows = parse_measurements_text(csv_file.getvalue().decode("utf-8"))
+        calibration = calib.calibration_from_dict(json.loads(calib_file.getvalue()))
+    except (ValueError, KeyError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        st.error(f"Could not read inputs: {exc}")
+        return
+
+    summary = compute_errors(rows, calibration)
+
+    if not summary.rows:
+        st.warning(
+            "No rows passed the acceptance rules yet — the template is empty or every row "
+            "was rejected."
+        )
+    else:
+        table = [
+            {
+                "id": r.measurement_id,
+                "object": r.object_name,
+                "Z (m)": round(r.object_plane_depth_z_m, 3),
+                "actual W": round(r.actual_width_mm, 2),
+                "est W": round(row_error_columns(r)["estimated_width_mm"], 2),
+                "W abs err": round(row_error_columns(r)["width_absolute_error_mm"], 2),
+                "W %": round(row_error_columns(r)["width_percentage_error"], 2),
+                "actual H": round(r.actual_height_mm, 2),
+                "est H": round(row_error_columns(r)["estimated_height_mm"], 2),
+                "H abs err": round(row_error_columns(r)["height_absolute_error_mm"], 2),
+                "H %": round(row_error_columns(r)["height_percentage_error"], 2),
+            }
+            for r in summary.rows
+        ]
+        st.dataframe(table, use_container_width=True)
+
+        c1, c2, c3 = st.columns(3)
+        for col, label, stats in (
+            (c1, "Width", summary.width_stats),
+            (c2, "Height", summary.height_stats),
+            (c3, "Combined", summary.combined_stats),
+        ):
+            col.markdown(f"**{label}**")
+            col.metric("MAE (mm)", f"{stats.mae_mm:.2f}")
+            col.metric("MAPE (%)", f"{stats.mape_pct:.2f}")
+            col.caption(
+                f"mean signed {stats.mean_signed_error_mm:.2f} mm · "
+                f"std(n-1) {stats.sample_std_mm:.2f} mm · "
+                f"min {stats.min_error_mm:.2f} · max {stats.max_error_mm:.2f}"
+            )
+
+        actual, estimated = [], []
+        for r in summary.rows:
+            e = row_error_columns(r)
+            actual += [r.actual_width_mm, r.actual_height_mm]
+            estimated += [e["estimated_width_mm"], e["estimated_height_mm"]]
+        st.scatter_chart(
+            {"actual (mm)": actual, "estimated (mm)": estimated},
+            x="actual (mm)",
+            y="estimated (mm)",
+        )
+
+    if summary.rejected:
+        with st.expander(f"Rejected rows ({len(summary.rejected)})", expanded=not summary.rows):
+            for r in summary.rejected:
+                reasons = ", ".join(f for f in r.flags if f != "no_image_path") or "—"
+                st.write(f"**{r.measurement_id}** — {reasons}")
+
+    with st.expander("validation_summary.md preview"):
+        st.markdown(to_markdown_table(summary))
 
 
 def _theory_page() -> None:
