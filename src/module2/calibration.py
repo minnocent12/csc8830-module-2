@@ -356,9 +356,8 @@ def save_calibration(result: CalibrationResult, path: str | Path) -> Path:
     return path
 
 
-def load_calibration(path: str | Path) -> CalibrationResult:
-    """Load a :class:`CalibrationResult` from a JSON file written by :func:`save_calibration`."""
-    data = json.loads(Path(path).read_text())
+def calibration_from_dict(data: dict) -> CalibrationResult:
+    """Build a :class:`CalibrationResult` from a dict shaped like :func:`calibration_to_dict`."""
     return CalibrationResult(
         camera_matrix=np.asarray(data["camera_matrix"], dtype=float),
         dist_coeffs=np.asarray(data["dist_coeffs"], dtype=float),
@@ -370,3 +369,8 @@ def load_calibration(path: str | Path) -> CalibrationResult:
         used_images=list(data.get("used_images", [])),
         failed_images=list(data.get("failed_images", [])),
     )
+
+
+def load_calibration(path: str | Path) -> CalibrationResult:
+    """Load a :class:`CalibrationResult` from a JSON file written by :func:`save_calibration`."""
+    return calibration_from_dict(json.loads(Path(path).read_text()))

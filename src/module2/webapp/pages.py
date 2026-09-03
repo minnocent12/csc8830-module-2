@@ -11,12 +11,16 @@ Theory                Phase 4
 """
 from __future__ import annotations
 
+import json
+
 import cv2
 import numpy as np
 import streamlit as st
 
 from module2 import calibration as calib
+from module2.dimension_estimation import estimate_width_height
 from module2.io_utils import decode_image_bgr
+from module2.units import metres_to_mm
 from module2.webapp._page import PageSpec
 from module2.webapp.ui import pending_experiment_banner, placeholder_page
 
@@ -127,8 +131,97 @@ def _calibration_page() -> None:
     )
 
 
+def _point_inputs(label: str, defaults: tuple[float, float, float, float]) -> tuple[
+    tuple[float, float], tuple[float, float]
+]:
+    st.markdown(f"**{label}** — two endpoint pixels")
+    c1, c2, c3, c4 = st.columns(4)
+    x1 = c1.number_input(f"{label} p1 x", value=float(defaults[0]), key=f"{label}_x1")
+    y1 = c2.number_input(f"{label} p1 y", value=float(defaults[1]), key=f"{label}_y1")
+    x2 = c3.number_input(f"{label} p2 x", value=float(defaults[2]), key=f"{label}_x2")
+    y2 = c4.number_input(f"{label} p2 y", value=float(defaults[3]), key=f"{label}_y2")
+    return (float(x1), float(y1)), (float(x2), float(y2))
+
+
 def _estimation_page() -> None:
-    placeholder_page("Dimension Estimation", "Phase 2")
+    st.header("Dimension Estimation")
+    st.write(
+        "Estimate an object's real-world width and height by back-projecting user-selected "
+        "pixel points onto a fronto-parallel plane at the measured optical-axis depth. "
+        "See `docs/assumptions.md`. No automatic object detection — you supply the points."
+    )
+
+    image_file = st.file_uploader("Object image (raw, undistorted-free)", type=_IMAGE_TYPES)
+    calib_file = st.file_uploader("calibration.json", type=["json"])
+    if image_file is None or calib_file is None:
+        pending_experiment_banner(
+            "Upload the object image and the calibration.json produced on the Calibration page."
+        )
+        return
+
+    try:
+        bgr = decode_image_bgr(image_file.getvalue())
+    except ValueError:
+        st.error("Could not decode the image.")
+        return
+    try:
+        calibration = calib.calibration_from_dict(json.loads(calib_file.getvalue()))
+    except (ValueError, KeyError, json.JSONDecodeError) as exc:
+        st.error(f"Could not read calibration.json: {exc}")
+        return
+
+    h, w = bgr.shape[:2]
+    st.image(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB), caption=f"{w}×{h} px", use_container_width=True)
+
+    distance_m = float(
+        st.number_input(
+            "Object-plane depth Z along the optical axis (metres)",
+            min_value=0.1,
+            value=2.5,
+            step=0.05,
+            format="%.2f",
+        )
+    )
+    if distance_m <= 2.0:
+        st.info("Step 3 validation requires the object-plane depth to exceed 2 m.")
+
+    width_pts = _point_inputs("Width", (w * 0.25, h * 0.5, w * 0.75, h * 0.5))
+    height_pts = _point_inputs("Height", (w * 0.5, h * 0.25, w * 0.5, h * 0.75))
+
+    if not st.button("Estimate dimensions", type="primary"):
+        return
+
+    for name, pts in (("Width", width_pts), ("Height", height_pts)):
+        for x, y in pts:
+            if not (0 <= x < w and 0 <= y < h):
+                st.error(f"{name} point ({x:.0f}, {y:.0f}) is outside the image.")
+                return
+
+    z_mm = metres_to_mm(distance_m)
+    dims = estimate_width_height(
+        width_pts, height_pts, calibration.camera_matrix, calibration.dist_coeffs, z_mm
+    )
+
+    annotated = bgr.copy()
+    for (p1, p2), colour in ((width_pts, (0, 0, 255)), (height_pts, (0, 200, 0))):
+        a = tuple(int(round(v)) for v in p1)
+        b = tuple(int(round(v)) for v in p2)
+        cv2.line(annotated, a, b, colour, 2)
+        cv2.circle(annotated, a, 5, colour, -1)
+        cv2.circle(annotated, b, 5, colour, -1)
+    st.image(
+        cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB),
+        caption="Red = width, green = height",
+        use_container_width=True,
+    )
+
+    m1, m2 = st.columns(2)
+    m1.metric("Width", f"{dims['width_mm']:.1f} mm", f"{dims['width_mm'] / 10:.2f} cm")
+    m2.metric("Height", f"{dims['height_mm']:.1f} mm", f"{dims['height_mm'] / 10:.2f} cm")
+    st.caption(
+        f"Z = {distance_m:.2f} m ({z_mm:.0f} mm). Distortion removed once via "
+        "cv2.undistortPoints; fronto-parallel plane assumed."
+    )
 
 
 def _validation_page() -> None:
