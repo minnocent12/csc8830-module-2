@@ -14,10 +14,12 @@ import pytest
 
 from module2.calibration import CalibrationResult
 from module2.validation import (
+    INPUT_COLUMNS,
     TEMPLATE_COLUMNS,
     compute_errors,
     load_measurements,
     parse_measurements_text,
+    to_filled_csv_text,
     to_markdown_table,
 )
 
@@ -164,6 +166,75 @@ def test_load_measurements_from_file(tmp_path) -> None:
     path.write_text(_csv_text([_rectangle_row(str(i), 200.0, 120.0, 2.5) for i in range(20)]))
     rows = load_measurements(path)
     assert len(rows) == 20
+
+
+def test_filled_csv_preserves_input_row_order_with_interleaving() -> None:
+    rows = [
+        _rectangle_row("a-ok", 200.0, 120.0, 2.5),
+        _rectangle_row("b-shallow", 200.0, 120.0, 1.5),  # rejected
+        _rectangle_row("c-ok", 250.0, 180.0, 3.0),
+        _rectangle_row("d-bad-actual", 200.0, 120.0, 2.5, actual_w=0.0),  # rejected
+        _rectangle_row("e-ok", 150.0, 400.0, 4.0),
+    ]
+    summary = compute_errors(parse_measurements_text(_csv_text(rows)), _calibration())
+    out_ids = [
+        r["measurement_id"] for r in csv.DictReader(io.StringIO(to_filled_csv_text(summary)))
+    ]
+    assert out_ids == ["a-ok", "b-shallow", "c-ok", "d-bad-actual", "e-ok"]
+
+
+def test_filled_csv_preserves_raw_source_values_exactly() -> None:
+    good = _rectangle_row("good", 200.0, 120.0, 2.5)
+    weird = _rectangle_row("weird", 200.0, 120.0, 2.5)
+    weird["actual_width_mm"] = "abc"  # invalid text, must survive verbatim
+    weird["object_name"] = "  spaced  "  # whitespace, not stripped in output
+    weird["w_p1_x"] = ""  # blank stays blank
+    blank = {c: "" for c in TEMPLATE_COLUMNS}
+
+    summary = compute_errors(
+        parse_measurements_text(_csv_text([good, weird, blank])), _calibration()
+    )
+    out_rows = list(csv.DictReader(io.StringIO(to_filled_csv_text(summary))))
+
+    w = next(r for r in out_rows if r["measurement_id"] == "weird")
+    assert w["actual_width_mm"] == "abc"
+    assert w["object_name"] == "  spaced  "
+    assert w["w_p1_x"] == ""
+
+    b = out_rows[2]
+    assert all(b[c] == "" for c in TEMPLATE_COLUMNS)  # fully blank row round-trips blank
+    assert "nan" not in ",".join(b.values()).lower()
+
+
+def test_filled_csv_only_changes_computed_columns_for_accepted_rows() -> None:
+    text = _csv_text([_rectangle_row("acc", 200.0, 120.0, 2.5)])
+    in_row = next(csv.DictReader(io.StringIO(text)))
+    summary = compute_errors(parse_measurements_text(text), _calibration())
+    out_row = next(csv.DictReader(io.StringIO(to_filled_csv_text(summary))))
+
+    for column in INPUT_COLUMNS:
+        assert out_row[column] == in_row[column]  # user columns byte-identical
+    assert out_row["estimated_width_mm"] not in ("", in_row["estimated_width_mm"])
+    assert float(out_row["width_absolute_error_mm"]) >= 0.0
+
+
+def test_reanalysis_of_filled_csv_is_stable() -> None:
+    rows = [
+        _rectangle_row("1", 200.0, 120.0, 2.5),
+        _rectangle_row("2", 200.0, 120.0, 1.5),  # rejected
+        _rectangle_row("3", 250.0, 180.0, 3.0),
+    ]
+    calibration = _calibration()
+    first = compute_errors(parse_measurements_text(_csv_text(rows)), calibration)
+    csv_1 = to_filled_csv_text(first)
+    second = compute_errors(parse_measurements_text(csv_1), calibration)
+    csv_2 = to_filled_csv_text(second)
+
+    assert [r.measurement_id for r in first.rows] == [r.measurement_id for r in second.rows]
+    assert [(r.measurement_id, tuple(r.flags)) for r in first.rejected] == [
+        (r.measurement_id, tuple(r.flags)) for r in second.rejected
+    ]
+    assert csv_1 == csv_2  # idempotent — the first pass did not mutate any source value
 
 
 def test_shipped_template_is_plain_and_empty() -> None:

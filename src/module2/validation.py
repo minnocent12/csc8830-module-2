@@ -52,7 +52,12 @@ TEMPLATE_COLUMNS: tuple[str, ...] = INPUT_COLUMNS + COMPUTED_COLUMNS
 
 @dataclass
 class MeasurementRow:
-    """One row of the validation template: user-entered fields plus computed estimates."""
+    """One row of the validation template: user-entered fields plus computed estimates.
+
+    ``source`` is the row's raw string cells exactly as read from the CSV (nothing parsed or
+    normalised); ``index`` is its 0-based position in the input file. Both are used to write
+    the filled CSV back in the original order without rewriting any user-entered value.
+    """
 
     measurement_id: str
     object_name: str
@@ -65,6 +70,8 @@ class MeasurementRow:
     estimated_width_mm: float | None = None
     estimated_height_mm: float | None = None
     flags: list[str] = field(default_factory=list)
+    index: int = -1
+    source: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -97,13 +104,14 @@ def _num(raw: dict[str, str], column: str, flags: list[str]) -> float:
 def parse_measurements(dict_rows: Iterable[dict[str, str]]) -> list[MeasurementRow]:
     """Parse CSV ``DictReader`` rows into :class:`MeasurementRow` objects (no computation)."""
     out: list[MeasurementRow] = []
-    for i, raw in enumerate(dict_rows, start=1):
+    for i, raw in enumerate(dict_rows):
         flags: list[str] = []
         image_path = (raw.get("image_path") or "").strip()
         if not image_path:
             flags.append("no_image_path")
+        source = {c: ("" if raw.get(c) is None else raw[c]) for c in TEMPLATE_COLUMNS}
         row = MeasurementRow(
-            measurement_id=(raw.get("measurement_id") or "").strip() or f"row{i}",
+            measurement_id=(raw.get("measurement_id") or "").strip() or f"row{i + 1}",
             object_name=(raw.get("object_name") or "").strip(),
             object_plane_depth_z_m=_num(raw, "object_plane_depth_z_m", flags),
             image_path=image_path,
@@ -118,6 +126,8 @@ def parse_measurements(dict_rows: Iterable[dict[str, str]]) -> list[MeasurementR
             actual_width_mm=_num(raw, "actual_width_mm", flags),
             actual_height_mm=_num(raw, "actual_height_mm", flags),
             flags=flags,
+            index=i,
+            source=source,
         )
         out.append(row)
     return out
@@ -222,6 +232,32 @@ def row_error_columns(row: MeasurementRow) -> dict[str, float]:
         "height_absolute_error_mm": abs(h_sig),
         "height_percentage_error": abs(h_sig) / row.actual_height_mm * 100.0,
     }
+
+
+def to_filled_csv_text(summary: ValidationSummary) -> str:
+    """Serialize the analysed rows back to CSV.
+
+    Guarantees:
+
+    * rows keep their **original input order** (accepted and rejected interleaved as in the
+      source file);
+    * every user-entered column is copied **verbatim** from the source row — blank stays
+      blank, invalid text stays exactly as entered, nothing is normalised to ``nan``;
+    * only :data:`COMPUTED_COLUMNS` are written, and only for accepted rows.
+
+    Re-running the analysis on the output therefore produces identical validation behaviour.
+    """
+    ordered = sorted([*summary.rows, *summary.rejected], key=lambda r: r.index)
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=list(TEMPLATE_COLUMNS))
+    writer.writeheader()
+    for row in ordered:
+        record: dict[str, object] = {c: row.source.get(c, "") for c in TEMPLATE_COLUMNS}
+        if row.estimated_width_mm is not None and row.estimated_height_mm is not None:
+            for column, value in row_error_columns(row).items():
+                record[column] = value
+        writer.writerow(record)
+    return buffer.getvalue()
 
 
 def _stats_block(title: str, stats: ErrorStatistics) -> list[str]:

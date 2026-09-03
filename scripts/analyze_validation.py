@@ -15,7 +15,6 @@ statistics), a filled CSV next to the input, and error plots under
 from __future__ import annotations
 
 import argparse
-import csv
 import sys
 from pathlib import Path
 
@@ -32,36 +31,13 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 from module2.calibration import load_calibration  # noqa: E402
 from module2.validation import (  # noqa: E402
-    TEMPLATE_COLUMNS,
     ValidationSummary,
     compute_errors,
     load_measurements,
     row_error_columns,
+    to_filled_csv_text,
     to_markdown_table,
 )
-
-
-def _write_filled_csv(summary: ValidationSummary, path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(TEMPLATE_COLUMNS))
-        writer.writeheader()
-        for row in [*summary.rows, *summary.rejected]:
-            record = {
-                "measurement_id": row.measurement_id,
-                "object_name": row.object_name,
-                "object_plane_depth_z_m": row.object_plane_depth_z_m,
-                "image_path": row.image_path,
-                "w_p1_x": row.width_points[0][0], "w_p1_y": row.width_points[0][1],
-                "w_p2_x": row.width_points[1][0], "w_p2_y": row.width_points[1][1],
-                "h_p1_x": row.height_points[0][0], "h_p1_y": row.height_points[0][1],
-                "h_p2_x": row.height_points[1][0], "h_p2_y": row.height_points[1][1],
-                "actual_width_mm": row.actual_width_mm,
-                "actual_height_mm": row.actual_height_mm,
-            }
-            if row.estimated_width_mm is not None:
-                record.update(row_error_columns(row))
-            writer.writerow(record)
 
 
 def _write_plots(summary: ValidationSummary, figures_dir: Path) -> list[Path]:
@@ -147,7 +123,8 @@ def main(argv: list[str] | None = None) -> int:
     args.summary.parent.mkdir(parents=True, exist_ok=True)
     args.summary.write_text(to_markdown_table(summary) + "\n")
     filled_csv = args.measurements.with_name(args.measurements.stem + "_filled.csv")
-    _write_filled_csv(summary, filled_csv)
+    filled_csv.parent.mkdir(parents=True, exist_ok=True)
+    filled_csv.write_text(to_filled_csv_text(summary), newline="")
     figures = _write_plots(summary, args.figures_dir)
 
     print(f"accepted: {len(summary.rows)}   rejected: {len(summary.rejected)}")
