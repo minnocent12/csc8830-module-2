@@ -77,6 +77,18 @@ def test_chessboard_object_points_grid() -> None:
     assert objp[:, 1].max() == pytest.approx(25.0 * 5)
 
 
+@pytest.mark.parametrize("bad", [0.0, -5.0, float("nan"), float("inf")])
+def test_chessboard_object_points_rejects_bad_square_size(bad: float) -> None:
+    with pytest.raises(ValueError, match="finite positive"):
+        chessboard_object_points((9, 6), bad)
+
+
+def test_find_chessboard_corners_rejects_non_uint8_image() -> None:
+    board = _render_chessboard(PATTERN).astype(np.float32)  # valid 2D shape, wrong dtype
+    with pytest.raises(ValueError, match="uint8"):
+        find_chessboard_corners(board, PATTERN)
+
+
 def test_parse_pattern_size() -> None:
     assert parse_pattern_size("9x6") == (9, 6)
     assert parse_pattern_size("7X5") == (7, 5)

@@ -17,6 +17,7 @@ Pipeline
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -76,15 +77,24 @@ def chessboard_object_points(pattern_size: tuple[int, int], square_size_mm: floa
 
     Args:
         pattern_size: inner-corner count ``(cols, rows)``.
-        square_size_mm: measured square edge length, in millimetres.
+        square_size_mm: measured square edge length, in millimetres; must be finite and > 0.
 
     Returns:
         ``(cols * rows, 3)`` ``float32`` array with ``Z = 0`` and spacing ``square_size_mm``.
+
+    Raises:
+        ValueError: If ``square_size_mm`` is not a finite positive number (rejects zero,
+            negatives, NaN and infinity).
     """
+    size = float(square_size_mm)
+    if not math.isfinite(size) or size <= 0.0:
+        raise ValueError(
+            f"square_size_mm must be a finite positive number, got {square_size_mm!r}"
+        )
     cols, rows = pattern_size
     objp = np.zeros((cols * rows, 3), np.float32)
     objp[:, :2] = np.mgrid[0:cols, 0:rows].T.reshape(-1, 2)
-    objp *= float(square_size_mm)
+    objp *= size
     return objp
 
 
@@ -102,10 +112,14 @@ def find_chessboard_corners(
         the full pattern was not found.
 
     Raises:
-        ValueError: If ``image_gray`` is not single-channel.
+        ValueError: If ``image_gray`` is not a single-channel 8-bit (``uint8``) image.
     """
     if image_gray.ndim != 2:
         raise ValueError("expected a single-channel grayscale image")
+    if image_gray.dtype != np.uint8:
+        raise ValueError(
+            f"expected an 8-bit (uint8) grayscale image, got dtype {image_gray.dtype}"
+        )
     flags = cv2.CALIB_CB_ADAPTIVE_THRESH | cv2.CALIB_CB_NORMALIZE_IMAGE
     found, corners = cv2.findChessboardCorners(image_gray, pattern_size, flags=flags)
     if not found:
