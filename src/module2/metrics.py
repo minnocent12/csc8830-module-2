@@ -23,6 +23,7 @@ Status: stub — implemented in Phase 3.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import numpy as np
@@ -71,6 +72,41 @@ def compute_error_statistics(
         A populated :class:`ErrorStatistics`.
 
     Raises:
-        ValueError: if the arrays differ in length, are empty, or any actual value is <= 0.
+        ValueError: if the arrays differ in length, are empty, contain non-finite values,
+            or any actual value is <= 0.
     """
-    raise NotImplementedError("Implemented in Phase 3.")
+    actual = np.asarray(actual_values, dtype=np.float64).ravel()
+    estimated = np.asarray(estimated_values, dtype=np.float64).ravel()
+
+    if actual.size == 0:
+        raise ValueError("compute_error_statistics: no values given")
+    if actual.shape != estimated.shape:
+        raise ValueError(
+            "compute_error_statistics: actual_values and estimated_values must have the "
+            f"same length, got {actual.size} and {estimated.size}"
+        )
+    if not (np.isfinite(actual).all() and np.isfinite(estimated).all()):
+        raise ValueError("compute_error_statistics: all values must be finite")
+    if np.any(actual <= 0.0):
+        raise ValueError(
+            "compute_error_statistics: every actual value must be > 0 "
+            "(the percentage error divides by it)"
+        )
+
+    signed = estimated - actual
+    absolute = np.abs(signed)
+    percentage = absolute / actual * 100.0
+    n = int(actual.size)
+
+    return ErrorStatistics(
+        n=n,
+        mean_signed_error_mm=float(np.mean(signed)),
+        mae_mm=float(np.mean(absolute)),
+        mape_pct=float(np.mean(percentage)),
+        sample_std_mm=float(np.std(signed, ddof=1)) if n >= 2 else math.nan,
+        min_error_mm=float(np.min(absolute)),
+        max_error_mm=float(np.max(absolute)),
+        signed_error_mm=signed,
+        absolute_error_mm=absolute,
+        percentage_error=percentage,
+    )
