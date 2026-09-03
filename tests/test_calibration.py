@@ -188,6 +188,55 @@ def test_save_and_load_calibration_roundtrip(tmp_path) -> None:
     assert loaded.rms_reprojection_error == pytest.approx(result.rms_reprojection_error)
 
 
+def test_compute_reprojection_error_rejects_mismatched_lengths() -> None:
+    obj_list, img_list = _synthetic_views(n=4, seed=5)
+    rvecs, tvecs = [], []
+    for objp, imgp in zip(obj_list, img_list):
+        ok, rvec, tvec = cv2.solvePnP(objp, imgp, K_TRUE, DIST_TRUE)
+        assert ok
+        rvecs.append(rvec)
+        tvecs.append(tvec)
+    # one tvec short: without the guard, zip() would silently drop the last view.
+    with pytest.raises(ValueError, match="mismatched input lengths"):
+        compute_reprojection_error(
+            obj_list, img_list, rvecs, tvecs[:-1], K_TRUE, DIST_TRUE
+        )
+
+
+def test_calibrate_rejects_mismatched_names_length() -> None:
+    obj_list, img_list = _synthetic_views(n=6, seed=6)
+    assert len(obj_list) >= 4
+    with pytest.raises(ValueError, match="mismatched input lengths"):
+        calibrate(
+            obj_list,
+            img_list,
+            IMAGE_SIZE,
+            pattern_size=PATTERN,
+            square_size_mm=SQUARE_MM,
+            names=["a", "b", "c"],  # fewer names than views
+        )
+
+
+def test_calibrate_rejects_mismatched_object_and_image_length() -> None:
+    obj_list, img_list = _synthetic_views(n=6, seed=7)
+    assert len(obj_list) >= 4
+    with pytest.raises(ValueError, match="mismatched input lengths"):
+        calibrate(
+            obj_list,
+            img_list[:-1],  # one image-point set short
+            IMAGE_SIZE,
+            pattern_size=PATTERN,
+            square_size_mm=SQUARE_MM,
+            names=[f"v{i}" for i in range(len(obj_list))],
+        )
+
+
+def test_calibrate_from_gray_images_rejects_mismatched_names() -> None:
+    grays = [np.zeros((200, 200), np.uint8) for _ in range(3)]
+    with pytest.raises(ValueError, match="len\\(gray_images\\)"):
+        calibrate_from_gray_images(grays, ["a", "b"], PATTERN, SQUARE_MM)
+
+
 def test_undistort_image_returns_new_array_without_mutating_input() -> None:
     img = np.random.default_rng(0).integers(0, 256, (32, 40, 3), dtype=np.uint8)
     snapshot = img.copy()

@@ -128,11 +128,24 @@ def compute_reprojection_error(
 
     ``overall_rms`` is the root-mean-square over every corner of every view;
     ``per_view_rms`` is the RMS within each view.
+
+    Raises:
+        ValueError: If ``object_points``, ``image_points``, ``rvecs`` and ``tvecs`` do not
+            all have the same length (silent ``zip`` truncation is not allowed).
     """
+    n_views = len(object_points)
+    if not (len(image_points) == len(rvecs) == len(tvecs) == n_views):
+        raise ValueError(
+            "compute_reprojection_error: mismatched input lengths — "
+            f"object_points={n_views}, image_points={len(image_points)}, "
+            f"rvecs={len(rvecs)}, tvecs={len(tvecs)}; every view must have all four."
+        )
     per_view: list[float] = []
     total_sq = 0.0
     total_pts = 0
-    for objp, imgp, rvec, tvec in zip(object_points, image_points, rvecs, tvecs):
+    for objp, imgp, rvec, tvec in zip(
+        object_points, image_points, rvecs, tvecs, strict=True
+    ):
         projected, _ = cv2.projectPoints(objp, rvec, tvec, camera_matrix, dist_coeffs)
         projected = projected.reshape(-1, 2)
         observed = np.asarray(imgp, dtype=np.float64).reshape(-1, 2)
@@ -167,8 +180,18 @@ def calibrate(
         A populated :class:`CalibrationResult`.
 
     Raises:
-        ValueError: If fewer than three views are supplied.
+        ValueError: If fewer than three views are supplied, or if ``object_points``,
+            ``image_points`` and ``names`` do not all have the same length. The length
+            check guarantees ``used_images`` / ``num_images`` describe exactly the views
+            passed to ``cv2.calibrateCamera``.
     """
+    if not (len(image_points) == len(names) == len(object_points)):
+        raise ValueError(
+            "calibrate: mismatched input lengths — "
+            f"object_points={len(object_points)}, image_points={len(image_points)}, "
+            f"names={len(names)}; used_images/num_images must describe exactly the "
+            "calibrated views."
+        )
     if len(object_points) < 3:
         raise ValueError(f"need at least 3 valid views to calibrate, got {len(object_points)}")
     obj = [np.asarray(o, np.float32).reshape(-1, 1, 3) for o in object_points]
@@ -197,9 +220,17 @@ def calibrate_from_gray_images(
     """Detect corners in each grayscale image, then calibrate.
 
     Raises:
-        ValueError: If the images do not share one resolution, or the chessboard is not
-            detected in any image, or fewer than three detections succeed.
+        ValueError: If ``len(gray_images) != len(names)`` (which would silently drop images
+            or mislabel failed-image records), or the images do not share one resolution, or
+            the chessboard is not detected in any image, or fewer than three detections
+            succeed.
     """
+    if len(gray_images) != len(names):
+        raise ValueError(
+            "calibrate_from_gray_images: len(gray_images)="
+            f"{len(gray_images)} != len(names)={len(names)}; every image needs a name so "
+            "used/failed records stay accurate."
+        )
     template = chessboard_object_points(pattern_size, square_size_mm)
     obj_points: list[np.ndarray] = []
     img_points: list[np.ndarray] = []
@@ -207,7 +238,7 @@ def calibrate_from_gray_images(
     failed: list[str] = []
     image_size: tuple[int, int] | None = None
 
-    for gray, name in zip(gray_images, names):
+    for gray, name in zip(gray_images, names, strict=True):
         if gray.ndim != 2:
             raise ValueError(f"{name}: expected a single-channel grayscale image")
         height, width = gray.shape
