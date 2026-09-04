@@ -28,6 +28,15 @@ def test_manifest_without_section_order_raises(tmp_path: Path) -> None:
         manifest_sections(tmp_path / "m.md")
 
 
+def test_manifest_with_duplicate_section_path_raises(tmp_path: Path) -> None:
+    mf = _write_manifest(tmp_path, ["docs/a.md", "results/b.md", "docs/a.md"])
+    with pytest.raises(ValueError, match="duplicate section path"):
+        manifest_sections(mf)
+    # assemble_report goes through manifest_sections, so it rejects the manifest too
+    with pytest.raises(ValueError, match="duplicate section path"):
+        assemble_report(mf, tmp_path)
+
+
 def test_assemble_concatenates_sections_in_order_without_duplication(tmp_path: Path) -> None:
     (tmp_path / "docs").mkdir()
     (tmp_path / "results").mkdir()

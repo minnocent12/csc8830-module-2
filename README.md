@@ -12,8 +12,8 @@ workflow, and a two-camera projection theory write-up.
 
 - Python 3.10+
 - `pip install -e ".[dev]"` — installs `module2` plus `pytest`
-- For the report PDF only: `pandoc` and a LaTeX engine (installed separately). The Markdown
-  report is produced without them.
+- For the report **PDF** only: `pandoc` **and** a LaTeX engine supported by pandoc, both
+  installed separately. `results/module2_report.md` is produced without them.
 
 ## Install & run (from this repository root)
 
@@ -102,8 +102,11 @@ Run from this repository root (prefix scripts with `Module_2/` from the workspac
    ```bash
    python scripts/build_report.py
    ```
-   → `results/module2_report.md` (always) and `results/module2_report.pdf` (if `pandoc` is
-   installed). Sections you have not generated yet appear as *pending* notes.
+   `results/module2_report.md` is **always** written. `results/module2_report.pdf` is
+   produced only when **both `pandoc` and a LaTeX engine supported by pandoc** are
+   installed; if either is missing the script leaves the Markdown report intact and prints
+   the exact `pandoc` command to run later. Sections you have not generated yet appear as
+   *pending* notes.
 
 ## Known limitations
 

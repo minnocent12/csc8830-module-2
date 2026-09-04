@@ -27,7 +27,12 @@ def manifest_sections(manifest_path: str | Path) -> list[str]:
     """Return the ordered list of repo-relative section paths from the manifest.
 
     The manifest must contain a ``## Section order`` heading followed by a fenced code block
-    with one repo-relative path per line (blank lines and ``#`` comments are ignored).
+    with one repo-relative path per line (blank lines and ``#`` comments are ignored). Each
+    path must appear **exactly once** — a repeated path would make :func:`assemble_report`
+    emit the same section twice, so it is rejected here.
+
+    Raises:
+        ValueError: if the fenced list is missing, empty, or contains a duplicate path.
     """
     text = Path(manifest_path).read_text(encoding="utf-8")
     match = _SECTION_ORDER_RE.search(text)
@@ -42,6 +47,18 @@ def manifest_sections(manifest_path: str | Path) -> list[str]:
     ]
     if not paths:
         raise ValueError(f"{manifest_path}: the 'Section order' list is empty")
+
+    seen: set[str] = set()
+    duplicates: list[str] = []
+    for path in paths:
+        if path in seen:
+            duplicates.append(path)
+        seen.add(path)
+    if duplicates:
+        raise ValueError(
+            f"{manifest_path}: duplicate section path(s) in the 'Section order' list: "
+            f"{', '.join(sorted(set(duplicates)))}. Each section must appear exactly once."
+        )
     return paths
 
 
