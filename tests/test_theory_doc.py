@@ -59,6 +59,8 @@ def test_document_exists() -> None:
         # 6. relationship: epipolar, essential, fundamental
         "epipolar line",
         "E = [t]_\\times R",
+        # full 3-row skew-symmetric convention for [t]_x
+        "[t]_\\times = \\begin{bmatrix} 0 & -t_z & t_y \\\\ t_z & 0 & -t_x \\\\ -t_y & t_x & 0 \\end{bmatrix}",
         "F = K_2^{-\\top} [t]_\\times R\\, K_1^{-1}",
         "x_2^\\top F\\,x_1 = 0",
         "epipole",
@@ -115,6 +117,29 @@ def test_pure_translation_disparity_sign_is_positive_under_P2_convention(text: s
     assert "X_2 = X_1 + b" in text
 
 
+def _bmatrices_after(text: str, marker: str) -> list[np.ndarray]:
+    """Every numeric ``\\begin{bmatrix}...\\end{bmatrix}`` that appears after ``marker``.
+
+    Symbolic matrices (entries that are not numbers) are skipped.
+    """
+    begin, end = r"\begin{bmatrix}", r"\end{bmatrix}"
+    out: list[np.ndarray] = []
+    pos = text.index(marker)
+    while True:
+        try:
+            b = text.index(begin, pos)
+        except ValueError:
+            return out
+        e = text.index(end, b)
+        body = text[b + len(begin) : e]
+        rows = [r for r in body.split(r"\\") if r.strip()]
+        try:
+            out.append(np.array([[float(c) for c in row.split("&")] for row in rows]))
+        except ValueError:
+            pass
+        pos = e + len(end)
+
+
 def test_worked_example_matches_recomputation(text: str) -> None:
     K = np.array([[800.0, 0.0, 320.0], [0.0, 800.0, 240.0], [0.0, 0.0, 1.0]])
     th = np.deg2rad(10.0)
@@ -128,13 +153,29 @@ def test_worked_example_matches_recomputation(text: str) -> None:
     P2 = R @ P1 + t
     u2 = K @ (P2 / P2[2])
     tx = np.array([[0, -t[2], t[1]], [t[2], 0, -t[0]], [-t[1], t[0], 0.0]])
-    E = tx @ R
+    E = tx @ R  # E = [t]_x R  (the document's chosen convention)
     x1h, x2h = P1 / P1[2], P2 / P2[2]
 
     # epipolar constraint holds for the stated point
     assert abs(float(x2h @ E @ x1h)) < 1e-9
 
-    # printed values in the document match the recomputation
+    # printed scalar values match the recomputation
     assert f"({u1[0]:.3f},\\ {u1[1]:.3f})" in text  # (352.000, 264.000)
     assert f"({u2[0]:.4f},\\ {u2[1]:.4f})" in text  # (397.3033, 264.9257)
-    assert f"E = [t]_\\times R = \\begin{{bmatrix}} 0 & {E[0,1]:.0f} & 0" in text
+
+    # the FULL rendered [t]_x and E matrices in section 9 must match, every row
+    rendered = _bmatrices_after(text, "**Essential matrix.**")
+    assert len(rendered) >= 2, "section 9 must render both [t]_x and E numerically"
+    rendered_tx, rendered_E = rendered[0], rendered[1]
+    assert rendered_tx.shape == (3, 3) and rendered_E.shape == (3, 3)
+    assert np.allclose(rendered_tx, tx, atol=1e-4)
+    assert np.allclose(rendered_E, E, atol=1e-4)
+
+
+def test_pure_translation_essential_matrix_matches_convention() -> None:
+    """For R = I, t = (b, 0, 0): E = [t]_x = [[0,0,0],[0,0,-b],[0,b,0]] (doc's convention)."""
+    b = 60.0
+    t = np.array([b, 0.0, 0.0])
+    tx = np.array([[0, -t[2], t[1]], [t[2], 0, -t[0]], [-t[1], t[0], 0.0]])
+    assert np.array_equal(tx, np.array([[0.0, 0.0, 0.0], [0.0, 0.0, -b], [0.0, b, 0.0]]))
+    assert np.array_equal(tx @ np.eye(3), tx)  # E = [t]_x when R = I
