@@ -31,6 +31,8 @@ docs/theory_two_camera_projection.md
 | `results/validation_summary.md` | 20-trial table + width / height / combined statistics | `scripts/analyze_validation.py` on real data |
 | `docs/theory_two_camera_projection.md` | two-camera projection derivation | authored (Phase 4) |
 
-Error plots referenced by `validation_summary.md` are written to `docs/report/figures/` by
-`scripts/analyze_validation.py`; `build_report.py` passes that directory to pandoc via
-`--resource-path`.
+`scripts/analyze_validation.py` writes the error plots to `docs/report/figures/` and appends
+`![caption](figures/<name>.png)` links to `results/validation_summary.md`. `build_report.py`
+puts `docs/report/` on pandoc's `--resource-path`, so those links resolve to the plot files
+when the PDF is rendered. If validation has not been run, the section is *pending* and no
+figures are referenced.

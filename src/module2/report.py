@@ -91,7 +91,10 @@ def assemble_report(
     """
     root = Path(repo_root)
     stamp = today or _dt.date.today().isoformat()
-    parts = [f"% {REPORT_TITLE}", f"% Generated {stamp}", ""]
+    # Pandoc %-style title block: line 1 = title, line 2 = author(s), line 3 = date.
+    # The report has no author, so line 2 is left empty ("%") and the build date goes
+    # on line 3 where pandoc renders it as the document date.
+    parts = [f"% {REPORT_TITLE}", "%", f"% Generated {stamp}", ""]
 
     for rel in manifest_sections(manifest_path):
         target = root / rel

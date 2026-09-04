@@ -97,7 +97,8 @@ Run from this repository root (prefix scripts with `Module_2/` from the workspac
        --calibration data/calibration.json
    ```
    → `results/validation_summary.md`, a `*_filled.csv`, and error plots in
-   `docs/report/figures/`.
+   `docs/report/figures/`. The summary links those plots (`![…](figures/…)`), so they are
+   embedded in the report PDF in step 5.
 5. **Build the report:**
    ```bash
    python scripts/build_report.py
