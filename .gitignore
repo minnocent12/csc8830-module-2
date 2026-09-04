@@ -19,3 +19,12 @@ data/calibration_images/*
 data/experiments/*
 !data/calibration_images/.gitkeep
 !data/experiments/.gitkeep
+
+# Generated from real experiments (not committed; measurements_template.csv stays tracked)
+data/calibration.json
+results/calibration_report.md
+results/validation_summary.md
+results/*_filled.csv
+results/module2_report.md
+results/module2_report.pdf
+docs/report/figures/*.png

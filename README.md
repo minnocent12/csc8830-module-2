@@ -4,15 +4,16 @@ Smartphone camera calibration (OpenCV) and real-world 2D object dimension estima
 perspective back-projection, with a Streamlit app, a 20-trial experimental-validation
 workflow, and a two-camera projection theory write-up.
 
-> **Status: scaffold (Phase 0).** Core functionality is stubbed and lands phase by phase
-> (see the table below). Calibration and every measured result are **pending real
-> smartphone data** — nothing in this repository fabricates experimental values.
+> Calibration output and all measured results come from **your** real experiments. Nothing
+> in this repository fabricates calibration values, measurements, or statistics — the
+> template ships empty and un-run sections of the report are marked *pending*.
 
 ## Requirements
 
 - Python 3.10+
 - `pip install -e ".[dev]"` — installs `module2` plus `pytest`
-- For the report PDF only: `pandoc` and a LaTeX engine (installed separately)
+- For the report PDF only: `pandoc` and a LaTeX engine (installed separately). The Markdown
+  report is produced without them.
 
 ## Install & run (from this repository root)
 
@@ -32,10 +33,25 @@ a clone even if the editable install is skipped or its `.pth` is not honoured (s
 Python 3.14 builds); only the third-party packages in `pyproject.toml` are strictly
 required. `pytest` finds the package via `pythonpath = ["src"]` in `pyproject.toml`.
 
+## Web application
+
+`streamlit run app.py` opens all four assignment components in one app:
+
+| Page | Purpose |
+| ---- | ------- |
+| Calibration | run the chessboard calibration, view `K` / distortion / reprojection error, download `calibration.json` |
+| Dimension Estimation | back-project user-selected pixel points to real-world width/height at a measured depth |
+| Validation Analysis | load the 20-trial CSV; per-row and width / height / combined error statistics |
+| Theory | the two-camera projection derivation |
+
+Deploy for the instructor: a hosted Streamlit URL is preferred if available (e.g. Streamlit
+Community Cloud pointed at `app.py`); otherwise the exact local steps above plus the demo
+video are sufficient. Record the URL or steps in the final PDF.
+
 ## Layout
 
 ```
-app.py                     standalone Streamlit submission app (thin shell)
+app.py                     standalone Streamlit app (thin shell)
 src/module2/               core CV/math — never imports Streamlit
   units.py  io_utils.py    unit conversions; image IO helpers
   geometry.py              the single canonical undistort + back-projection pipeline
@@ -43,37 +59,60 @@ src/module2/               core CV/math — never imports Streamlit
   dimension_estimation.py  object width/height from user pixel points + object-plane depth
   metrics.py               validation error definitions & statistics
   validation.py            20-trial CSV -> per-row errors + summary
+  report.py                assemble the report from its canonical section files
   webapp/                  Streamlit pages + the PageSpec / get_pages provider contract
 scripts/                   run_calibration, estimate_dimensions, analyze_validation, build_report
 tests/                     deterministic unit tests
 data/                      calibration_images/ and experiments/ (your photos; git-ignored)
-results/                   generated calibration_report.md, validation_summary.md, measurements_template.csv
-docs/                      architecture, capture protocol, assumptions, validation protocol, theory, report/
+results/                   measurements_template.csv (tracked); generated reports/plots (git-ignored)
+docs/                      capture protocol, calibration method, assumptions, validation protocol,
+                           two-camera theory, report/ (manifest + overview + figures)
 ```
 
-## Workflow (phases)
+## Reproducing the results
 
-| Phase | Branch | Deliverable |
-| ----- | ------ | ----------- |
-| 0 | `task/module-2-scaffold` | packaging, app shell, stubs, page-contract tests |
-| 1 | `task/module-2-camera-calibration` | chessboard calibration + capture protocol |
-| 2 | `task/module-2-object-dimension-estimation` | back-projection estimation |
-| 3 | `task/module-2-validation-analysis` | 20-trial validation tooling + template |
-| 4 | `task/module-2-two-camera-theory` | two-camera projection derivation |
-| 5 | `task/module-2-webapp-and-docs` | integration, report assembly, run/deploy |
+Run from this repository root (prefix scripts with `Module_2/` from the workspace root).
 
-## Reproducing results (once implemented)
+1. **Calibrate.** Follow `docs/calibration_capture_protocol.md` — print the 9×6 chessboard at
+   100 %, **measure the printed square** with calipers, lock AE/AF when supported, take
+   15–25 sharp varied-pose photos into `data/calibration_images/`. Then:
+   ```bash
+   python scripts/run_calibration.py --images-dir data/calibration_images \
+       --pattern 9x6 --square-size-mm <your measured value>
+   ```
+   → `data/calibration.json` + `results/calibration_report.md`.
+2. **Estimate a dimension** (sanity check):
+   ```bash
+   python scripts/estimate_dimensions.py --image data/experiments/img.jpg \
+       --calibration data/calibration.json --distance-m 2.6 \
+       --width-points "x1,y1 x2,y2" --height-points "x1,y1 x2,y2"
+   ```
+3. **Collect 20 trials.** Per `docs/validation_protocol.md`: real objects, object-plane
+   depth `> 2 m`, measured width/height, four pixel points each. Fill
+   `results/measurements_template.csv` (a plain CSV — one header + 20 rows).
+4. **Analyse:**
+   ```bash
+   python scripts/analyze_validation.py \
+       --measurements results/measurements_template.csv \
+       --calibration data/calibration.json
+   ```
+   → `results/validation_summary.md`, a `*_filled.csv`, and error plots in
+   `docs/report/figures/`.
+5. **Build the report:**
+   ```bash
+   python scripts/build_report.py
+   ```
+   → `results/module2_report.md` (always) and `results/module2_report.pdf` (if `pandoc` is
+   installed). Sections you have not generated yet appear as *pending* notes.
 
-1. Follow `docs/calibration_capture_protocol.md`; measure the printed chessboard square.
-2. `python scripts/run_calibration.py --images-dir data/calibration_images --pattern 9x6 --square-size-mm <measured>`
-3. `python scripts/estimate_dimensions.py --image <img> --calibration data/calibration.json --distance-m <z> --width-points "x1,y1 x2,y2" --height-points "x1,y1 x2,y2"`
-4. Collect 20 trials at object-plane depth > 2 m per `docs/validation_protocol.md`; fill `results/measurements_template.csv`.
-5. `python scripts/analyze_validation.py --measurements results/measurements_template.csv --calibration data/calibration.json`
-6. `python scripts/build_report.py --out results/module2_report.pdf`
+## Known limitations
 
-## Constraints
-
-- No machine-learning / deep-learning methods.
-- Manual pixel-point selection only — automatic object detection is out of scope.
-- Everything under `data/` and every generated experimental value is the user's real
-  measurement.
+- **Fronto-parallel assumption** — the object plane must be roughly parallel to the sensor;
+  tilt introduces perspective error.
+- **`Z` is optical-axis depth** — the camera projection centre is inside the phone, so the
+  field measurement uses the phone body as a proxy; keep the feature near the image centre.
+- **Autofocus** — if the phone re-focuses or switches lens between calibration and capture,
+  the intrinsics no longer apply; re-calibrate.
+- **Manual point selection** — pixel-point localisation error propagates into the estimate
+  (part of the reported error budget). No automatic object detection is in scope.
+- **No machine-learning / deep-learning methods** are used anywhere.

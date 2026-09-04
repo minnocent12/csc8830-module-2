@@ -1,16 +1,36 @@
 # Module 2 report — section manifest
 
-`scripts/build_report.py` assembles the final PDF by concatenating the canonical source
-files below **in order**. Each section's text lives in exactly one place; nothing here is a
-copy.
+`scripts/build_report.py` concatenates the section files listed below, **in order**, into a
+single Markdown document (`results/module2_report.md`) and renders it to
+`results/module2_report.pdf` with pandoc. The report has **no prose of its own** — each
+section lives in exactly one canonical file, so nothing is duplicated.
 
-| Order | Section | Canonical source | Filled in |
-| ----- | ------- | ---------------- | --------- |
-| 1 | Problem & overview | `docs/report/_overview.md` | Phase 5 |
-| 2 | Camera calibration — method | `docs/calibration_method.md` | Phase 1 |
-| 3 | Camera calibration — results | `results/calibration_report.md` | Phase 1 (real run) |
-| 4 | Dimension estimation — assumptions & method | `docs/assumptions.md` | Phase 2 |
-| 5 | Experimental validation | `results/validation_summary.md` | Phase 3 (real data) |
-| 6 | Two-camera projection theory | `docs/theory_two_camera_projection.md` | Phase 4 |
+A section file that has not been generated yet (for example `results/calibration_report.md`
+before calibration is run) is replaced by a short *pending* note; no placeholder values are
+invented.
 
-Figures are inserted from `docs/report/figures/` as referenced by the section files.
+## Section order
+
+```text
+docs/report/_overview.md
+docs/calibration_method.md
+results/calibration_report.md
+docs/assumptions.md
+results/validation_summary.md
+docs/theory_two_camera_projection.md
+```
+
+## Notes
+
+| Section source | Content | Produced by |
+| -------------- | ------- | ----------- |
+| `docs/report/_overview.md` | problem statement, workflow overview, GitHub link | authored (Phase 5) |
+| `docs/calibration_method.md` | calibration method + `data/calibration.json` schema | authored (Phase 1) |
+| `results/calibration_report.md` | measured `K`, distortion, RMS reprojection error | `scripts/run_calibration.py` on real photos |
+| `docs/assumptions.md` | dimension-estimation assumptions and method | authored (Phase 2) |
+| `results/validation_summary.md` | 20-trial table + width / height / combined statistics | `scripts/analyze_validation.py` on real data |
+| `docs/theory_two_camera_projection.md` | two-camera projection derivation | authored (Phase 4) |
+
+Error plots referenced by `validation_summary.md` are written to `docs/report/figures/` by
+`scripts/analyze_validation.py`; `build_report.py` passes that directory to pandoc via
+`--resource-path`.
