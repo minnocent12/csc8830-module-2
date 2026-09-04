@@ -14,6 +14,7 @@ fabricated content.
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import subprocess
 import sys
@@ -27,7 +28,10 @@ if _SRC.is_dir() and str(_SRC) not in sys.path:
 
 from module2.report import assemble_report  # noqa: E402
 
-_RESOURCE_PATH = f"{REPO_ROOT}:{REPO_ROOT / 'docs' / 'report'}"
+# pandoc joins --resource-path entries with the platform separator (':' POSIX, ';' Windows)
+_RESOURCE_PATH = os.pathsep.join(
+    [str(REPO_ROOT), str(REPO_ROOT / "docs" / "report")]
+)
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -59,11 +59,12 @@ def test_missing_section_becomes_pending_note_not_an_error(tmp_path: Path) -> No
 
 
 def test_assemble_against_the_real_repo_manifest() -> None:
+    # smoke test: the real manifest parses and assembles without error, and the always-
+    # present authored (tracked) sections are included in full. Whether the experiment
+    # outputs are present depends on workspace state, so it is not asserted here
+    # (test_missing_section_becomes_pending_note_not_an_error covers the pending path).
     md = assemble_report(REPO_ROOT / "docs" / "report" / "manifest.md", REPO_ROOT)
-    # authored sections that exist in the repo are included in full
+    assert md.startswith("% CSc 8830 Module 2")
     assert "Two-camera projection" in md
     assert "Dimension-estimation assumptions" in md
-    # sections produced only from real experiments are not in the repo -> pending
-    assert "results/calibration_report.md" in md
-    assert "results/validation_summary.md" in md
-    assert md.lower().count("pending") >= 2
+    assert "<!-- section: docs/theory_two_camera_projection.md -->" in md
