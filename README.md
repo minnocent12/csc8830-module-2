@@ -8,30 +8,24 @@ workflow, and a two-camera projection theory write-up.
 > in this repository fabricates calibration values, measurements, or statistics — the
 > template ships empty and un-run sections of the report are marked *pending*.
 
-## Requirements
-
-- Python 3.10+
-- `pip install -e ".[dev]"` — installs `module2` plus `pytest`
-- For the report **PDF** only: `pandoc` **and** a LaTeX engine supported by pandoc, both
-  installed separately. `results/module2_report.md` is produced without them.
-
-## Install & run (from this repository root)
+## Quick start
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
+git clone https://github.com/minnocent12/csc8830-module-2.git
+cd csc8830-module-2
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -e ".[dev]"
-pytest -q
 streamlit run app.py
 ```
 
-Working from the `Assignments/` workspace root instead? Prefix paths with `Module_2/`:
-`pip install -e "./Module_2[dev]"`, `streamlit run Module_2/app.py`,
-`pytest -q Module_2/tests`.
+That opens the app at <http://localhost:8501> with four pages in the sidebar: Calibration,
+Dimension Estimation, Validation Analysis, Theory. Stop it with `Ctrl+C`; leave the
+environment with `deactivate`.
 
-`app.py` and the `scripts/` entry points add `src/` to the path themselves, so they run from
-a clone even if the editable install is skipped or its `.pth` is not honoured (seen on some
-Python 3.14 builds); only the third-party packages in `pyproject.toml` are strictly
-required. `pytest` finds the package via `pythonpath = ["src"]` in `pyproject.toml`.
+Needs **Python 3.10+**. Run the test suite any time with `pytest -q` (all green on a fresh
+install). The report **PDF** step (only) also needs `pandoc` and a LaTeX engine supported by
+pandoc — everything else works without them.
 
 ## Web application
 
@@ -71,7 +65,7 @@ docs/                      capture protocol, calibration method, assumptions, va
 
 ## Reproducing the results
 
-Run from this repository root (prefix scripts with `Module_2/` from the workspace root).
+Run these from the repository root with the venv active.
 
 1. **Calibrate.** Follow `docs/calibration_capture_protocol.md` — print the 9×6 chessboard at
    100 %, **measure the printed square** with calipers, lock AE/AF when supported, take
@@ -120,3 +114,15 @@ Run from this repository root (prefix scripts with `Module_2/` from the workspac
 - **Manual point selection** — pixel-point localisation error propagates into the estimate
   (part of the reported error budget). No automatic object detection is in scope.
 - **No machine-learning / deep-learning methods** are used anywhere.
+
+## Notes
+
+- **Editable install / Python 3.14** — `app.py` and every file in `scripts/` add `src/` to
+  `sys.path` themselves, and `pytest` uses `pythonpath = ["src"]` from `pyproject.toml`, so
+  they work even if `pip install -e .` is skipped or its `.pth` file is not honoured (seen
+  on some Python 3.14 builds). Only the third-party packages in `pyproject.toml` are
+  strictly required.
+- **Course monorepo layout** — if this package sits inside the course workspace as
+  `Assignments/Module_2/` rather than a standalone clone, run the same commands from the
+  workspace root with a `Module_2/` prefix: `pip install -e "./Module_2[dev]"`,
+  `streamlit run Module_2/app.py`, `pytest -q Module_2/tests`.
