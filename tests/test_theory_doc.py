@@ -35,6 +35,10 @@ def test_document_exists() -> None:
         "World $\\{W\\}$",
         "Camera 1 $\\{C_1\\}$",
         "Camera 2 $\\{C_2\\}$",
+        # 1. pixel-coordinate origin is the image origin, not the principal point
+        "ordinary pixel coordinates",
+        "image origin (top-left pixel)",
+        "not the coordinate origin",
         # 2. intrinsics + how calibration yields K
         "f_x & s & c_x",
         "principal point",
@@ -62,9 +66,20 @@ def test_document_exists() -> None:
         "## 7. Parameters and variables",
         "known / static",
         "measured variable",
+        # 6.5 pure-translation disparity, consistent with P_2 = R P_1 + t
+        "P_2 = R\\,P_1 + t = P_1 + (b, 0, 0)^\\top",
+        "X_2 = X_1 + b",
+        "u_2 = u_1 + f\\,b/Z",
+        "The sign is **positive**",
         # 8. assumptions
         "## 8. Assumptions",
         "Lens distortion removed",
+        # 8. cv2.undistortPoints(..., P=None) convention (matches src/module2/geometry.py)
+        "cv2.undistortPoints(pts, K, dist, P=None)",
+        "returns normalized\ncamera coordinates".replace("\n", " "),
+        "$K^{-1}$ must not be applied again",
+        "cv2.undistortPoints(pts, K, dist, P=K)",
+        "not the canonical\n   Module 2 path".replace("\n   ", " "),
         # 9. example is labelled synthetic
         "synthetic",
         "not* measured",
@@ -72,6 +87,32 @@ def test_document_exists() -> None:
 )
 def test_covers_required_item(text: str, needle: str) -> None:
     assert needle in text
+
+
+def test_no_stale_negative_disparity(text: str) -> None:
+    assert "u_2 = u_1 - f\\,b/Z" not in text
+    assert "u_2 = u_1 + f\\,b/Z" in text
+
+
+def test_undistortpoints_convention_is_explicit(text: str) -> None:
+    assert "cv2.undistortPoints(pts, K, dist, P=None)" in text
+    assert "returns normalized camera coordinates" in text
+    assert "$K^{-1}$ must not be applied again" in text
+    assert "not the canonical Module 2 path" in text
+    assert "src/module2/geometry.py" in text
+
+
+def test_pure_translation_disparity_sign_is_positive_under_P2_convention(text: str) -> None:
+    f, cx = 800.0, 320.0
+    b, Z = 60.0, 1000.0
+    P1 = np.array([40.0, 30.0, Z])
+    P2 = P1 + np.array([b, 0.0, 0.0])  # R = I, t = (b, 0, 0)  ->  P2 = R P1 + t
+    u1 = f * P1[0] / P1[2] + cx
+    u2 = f * P2[0] / P2[2] + cx
+    assert u2 == pytest.approx(u1 + f * b / Z)  # positive disparity
+    assert u2 > u1
+    assert "u_2 = u_1 + f\\,b/Z" in text
+    assert "X_2 = X_1 + b" in text
 
 
 def test_worked_example_matches_recomputation(text: str) -> None:

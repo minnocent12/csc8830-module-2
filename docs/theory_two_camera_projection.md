@@ -17,7 +17,11 @@ assumptions.
 | World $\{W\}$ | arbitrary fixed point | right-handed | $P = (X, Y, Z)^\top$, homogeneous $\tilde P = (X, Y, Z, 1)^\top$ |
 | Camera 1 $\{C_1\}$ | Camera 1 optical centre | $z$ along the optical axis into the scene, $x$ right, $y$ down (OpenCV) | $P_1 = R_1 P + t_1$ |
 | Camera 2 $\{C_2\}$ | Camera 2 optical centre | same conventions | $P_2 = R_2 P + t_2$ |
-| Image $i$ | principal point | pixels: $u$ right, $v$ down | $(u_i, v_i)$ |
+| Image $i$ | top-left pixel | $u$ right, $v$ down | $(u_i, v_i)$ — ordinary pixel coordinates |
+
+$(u_i, v_i)$ are **ordinary image pixel coordinates**: the origin is the **image origin
+(top-left pixel)** and $v$ increases downward. The principal point $(c_x, c_y)$ is **not the
+coordinate origin** — it enters only as the offset added by $K$ (§2).
 
 $(R_i, t_i)$ are the **extrinsics** of camera $i$ — the pose of the world frame expressed in
 that camera's frame. The *normalized image plane* of a camera is the plane $z = 1$ in its
@@ -44,8 +48,10 @@ $$
 * $s$ — **skew**, non-zero only if the sensor axes are not perpendicular; $s \approx 0$ for
   modern cameras.
 
-A normalized camera-frame point $\hat x = (X_c/Z_c,\ Y_c/Z_c,\ 1)^\top$ maps to pixels by
-$(u, v, 1)^\top = K\,\hat x$, that is $u = f_x x + s y + c_x$, $v = f_y y + c_y$.
+A normalized camera-frame point $\hat x = (X_c/Z_c,\ Y_c/Z_c,\ 1)^\top$ maps to the ordinary
+pixel coordinates $(u, v)$ by $(u, v, 1)^\top = K\,\hat x$, that is
+$u = f_x x + s y + c_x$, $v = f_y y + c_y$. The additive $c_x, c_y$ are exactly what moves
+the origin from the principal point to the top-left pixel.
 
 **How calibration yields $K$.** Photograph a planar chessboard of *measured* square size
 from many poses. Each view gives 3D→2D correspondences and a homography
@@ -82,6 +88,10 @@ $$
 \qquad P_1 \equiv P = (X, Y, Z)^\top,
 \qquad \hat x_1 = K_1^{-1}(u_1, v_1, 1)^\top = \frac{P_1}{Z}.
 $$
+
+In code, $\hat x_1$ is produced **directly** by `cv2.undistortPoints(pts, K, dist, P=None)`;
+its output is already $K_1^{-1}$-applied (and distortion-corrected), so $K_1^{-1}$ must not
+be applied to it again — see assumption 2.
 
 ---
 
@@ -196,8 +206,19 @@ $e_1 \simeq K_1(-R^\top t)$ and $e_2 \simeq K_2\, t$.
   $x_2 \simeq K_2 R K_1^{-1} x_1$ is an *exact, depth-independent homography* (rotating about
   a single centre does not change which ray a point is on).
 * **Pure translation** $(R = I)$: $E = [t]_\times$; every epipolar line passes through
-  $e_2 \simeq K_2 t$. If further $t = (b, 0, 0)$ (horizontal baseline) the epipolar lines are
-  horizontal and $u_2 = u_1 - f\,b/Z$ — the classic stereo disparity relation, in which the
+  $e_2 \simeq K_2 t$. If further $t = (b, 0, 0)$ then, under our convention
+  $P_2 = R\,P_1 + t = P_1 + (b, 0, 0)^\top$, so $Z_2 = Z$ and $X_2 = X_1 + b$. With equal
+  intrinsics ($K_1 = K_2 = K$, $f \equiv f_x = f_y$) and zero skew this gives horizontal
+  epipolar lines and
+
+  $$
+  u_2 = u_1 + f\,b/Z, \qquad v_2 = v_1 .
+  $$
+
+  The sign is **positive**: adding $b$ to the point's $x$-coordinate in Camera 2's frame
+  shifts its image to the right. The textbook "disparity $= f\,b/Z$" with a *minus* sign
+  uses the opposite convention in which $t$ is Camera 2's *centre position*
+  ($P_2 = R(P_1 - C_2)$, giving $X_2 = X_1 - b$); the two conventions must not be mixed. The
   only residual unknown is the single scalar $Z$.
 * **General oblique $(R, t)$:** $R$ rotates each back-projected ray and $t$ offsets the
   centre; together they fix the epipolar geometry ($E$, $F$) — hence the epipolar line each
@@ -231,9 +252,16 @@ $e_1 \simeq K_1(-R^\top t)$ and $e_2 \simeq K_2\, t$.
 
 1. **Pinhole projection.** Each camera is an ideal central projection; finite-aperture /
    defocus effects are negligible for in-focus captures.
-2. **Lens distortion removed.** Every $(u, v)$ is the *undistorted* pixel coordinate, using
-   the distortion coefficients from calibration (`cv2.undistortPoints`), so the linear model
-   $\hat x = K^{-1}(u, v, 1)^\top$ holds exactly.
+2. **Lens distortion removed.** The linear model $\hat x = K^{-1}(u, v, 1)^\top$ holds
+   exactly because lens distortion has been removed with the calibrated coefficients. In
+   Module 2 the normalized calibrated point $\hat x$ is obtained **directly** from
+   `cv2.undistortPoints(pts, K, dist, P=None)`: with **`P=None` this call returns normalized
+   camera coordinates** on the $z = 1$ plane — distortion is already removed *and* $K^{-1}$
+   has effectively already been applied, so **$K^{-1}$ must not be applied again** to its
+   output (this matches `src/module2/geometry.py`). The alternative form
+   `cv2.undistortPoints(pts, K, dist, P=K)` instead returns *undistorted pixel* coordinates
+   $(u, v)$ — to which $K^{-1}$ would still have to be applied — and is **not the canonical
+   Module 2 path**.
 3. **Camera 1 is the reference frame** ($R_1 = I$, $t_1 = 0$) — a coordinate choice, fully
    general (§3).
 4. **Intrinsics constant.** $K_1, K_2$ and the distortion do not change between calibration
