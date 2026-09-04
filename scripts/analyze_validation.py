@@ -15,6 +15,7 @@ statistics), a filled CSV next to the input, and error plots under
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -38,6 +39,43 @@ from module2.validation import (  # noqa: E402
     to_filled_csv_text,
     to_markdown_table,
 )
+
+
+_REPORT_DIR = REPO_ROOT / "docs" / "report"
+
+#: Captions for the plots produced by :func:`_write_plots`, keyed by file name. Pandoc's
+#: implicit-figure handling renders the ``![...]`` alt text as the figure caption.
+_FIGURE_CAPTIONS: dict[str, str] = {
+    "validation_error_hist.png": (
+        "Distribution of the combined absolute error (mm) across every accepted width "
+        "and height measurement."
+    ),
+    "validation_estimated_vs_actual.png": (
+        "Estimated vs. actual dimension (mm) for width and height; the dashed line is "
+        "y = x (perfect estimate)."
+    ),
+}
+
+
+def _figure_links(figures: list[Path]) -> list[tuple[str, str]]:
+    """Turn plot paths into ``(caption, link)`` pairs for ``to_markdown_table``.
+
+    ``link`` is the plot's path relative to ``docs/report/`` (e.g.
+    ``figures/validation_error_hist.png``), which is the directory
+    ``scripts/build_report.py`` puts on pandoc's ``--resource-path``. A plot written
+    outside that tree (custom ``--figures-dir``) falls back to a relative path that still
+    points at it from ``docs/report/``.
+    """
+    report_dir = _REPORT_DIR.resolve()
+    links: list[tuple[str, str]] = []
+    for fig in figures:
+        resolved = fig.resolve()
+        try:
+            link = resolved.relative_to(report_dir).as_posix()
+        except ValueError:
+            link = os.path.relpath(resolved, report_dir).replace(os.sep, "/")
+        links.append((_FIGURE_CAPTIONS.get(fig.name, fig.name), link))
+    return links
 
 
 def _write_plots(summary: ValidationSummary, figures_dir: Path) -> list[Path]:
@@ -120,12 +158,15 @@ def main(argv: list[str] | None = None) -> int:
     rows = load_measurements(args.measurements)
     summary = compute_errors(rows, calibration)
 
+    figures = _write_plots(summary, args.figures_dir)
+
     args.summary.parent.mkdir(parents=True, exist_ok=True)
-    args.summary.write_text(to_markdown_table(summary) + "\n")
+    args.summary.write_text(
+        to_markdown_table(summary, figures=_figure_links(figures)) + "\n"
+    )
     filled_csv = args.measurements.with_name(args.measurements.stem + "_filled.csv")
     filled_csv.parent.mkdir(parents=True, exist_ok=True)
     filled_csv.write_text(to_filled_csv_text(summary), newline="")
-    figures = _write_plots(summary, args.figures_dir)
 
     print(f"accepted: {len(summary.rows)}   rejected: {len(summary.rejected)}")
     if summary.combined_stats is not None:

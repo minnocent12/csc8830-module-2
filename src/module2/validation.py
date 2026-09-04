@@ -18,7 +18,7 @@ import io
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Sequence
 
 from module2.calibration import CalibrationResult
 from module2.dimension_estimation import Point, estimate_width_height
@@ -277,8 +277,20 @@ def _stats_block(title: str, stats: ErrorStatistics) -> list[str]:
     ]
 
 
-def to_markdown_table(summary: ValidationSummary) -> str:
-    """Render a :class:`ValidationSummary` as the Markdown body of ``validation_summary.md``."""
+def to_markdown_table(
+    summary: ValidationSummary,
+    *,
+    figures: Sequence[tuple[str, str]] | None = None,
+) -> str:
+    """Render a :class:`ValidationSummary` as the Markdown body of ``validation_summary.md``.
+
+    ``figures`` is an optional list of ``(caption, path)`` pairs appended as a *Figures*
+    section (``![caption](path)``) when at least one measurement was accepted. ``path`` is
+    written verbatim, so the caller is responsible for making it resolve where the Markdown
+    is rendered — ``scripts/analyze_validation.py`` passes ``figures/<name>.png`` links that
+    ``scripts/build_report.py`` resolves via pandoc ``--resource-path=docs/report``. When
+    ``figures`` is omitted (e.g. the Streamlit preview) no image links are emitted.
+    """
     lines: list[str] = ["# Experimental validation — results", ""]
 
     if not summary.rows:
@@ -310,6 +322,11 @@ def to_markdown_table(summary: ValidationSummary) -> str:
         lines += _stats_block("Width", summary.width_stats)  # type: ignore[arg-type]
         lines += _stats_block("Height", summary.height_stats)  # type: ignore[arg-type]
         lines += _stats_block("Combined (width + height)", summary.combined_stats)  # type: ignore[arg-type]
+
+        if figures:
+            lines += ["## Figures", ""]
+            for caption, path in figures:
+                lines += [f"![{caption}]({path})", ""]
 
     if summary.rejected:
         lines += ["## Rejected rows", "", "| id | reason(s) |", "| -- | --------- |"]

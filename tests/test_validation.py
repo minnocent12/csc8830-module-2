@@ -155,6 +155,33 @@ def test_markdown_table_has_statistics_and_rejected_section() -> None:
     assert "| bad |" in md
 
 
+def test_markdown_table_embeds_figure_links_when_provided() -> None:
+    rows = parse_measurements_text(
+        _csv_text([_rectangle_row("1", 200.0, 120.0, 2.5)])
+    )
+    summary = compute_errors(rows, _calibration())
+    figs = [
+        ("Absolute error distribution", "figures/validation_error_hist.png"),
+        ("Estimated vs. actual", "figures/validation_estimated_vs_actual.png"),
+    ]
+
+    md = to_markdown_table(summary, figures=figs)
+
+    assert "## Figures" in md
+    assert "![Absolute error distribution](figures/validation_error_hist.png)" in md
+    assert "![Estimated vs. actual](figures/validation_estimated_vs_actual.png)" in md
+    # omitted by default (e.g. the Streamlit preview) — no broken image links there
+    assert "![" not in to_markdown_table(summary)
+
+
+def test_markdown_table_omits_figures_section_when_no_rows_accepted() -> None:
+    blank = {c: "" for c in TEMPLATE_COLUMNS}
+    summary = compute_errors(parse_measurements_text(_csv_text([blank])), _calibration())
+    md = to_markdown_table(summary, figures=[("x", "figures/x.png")])
+    assert "## Figures" not in md
+    assert "![" not in md
+
+
 def test_parse_rejects_bad_schema() -> None:
     text = "measurement_id,object_name\n1,box\n"
     with pytest.raises(ValueError, match="missing required column"):
