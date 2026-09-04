@@ -1,0 +1,181 @@
+"""Guards that the two-camera projection derivation stays complete and self-consistent.
+
+The assignment's "Items to Address" list is turned into presence checks, and the worked
+numerical example in the document is recomputed and compared to the printed values.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+DOC = (
+    Path(__file__).resolve().parents[1]
+    / "docs"
+    / "theory_two_camera_projection.md"
+)
+
+
+@pytest.fixture(scope="module")
+def text() -> str:
+    # collapse whitespace so presence checks are robust to hard line-wrapping
+    return " ".join(DOC.read_text(encoding="utf-8").split())
+
+
+def test_document_exists() -> None:
+    assert DOC.is_file()
+
+
+@pytest.mark.parametrize(
+    "needle",
+    [
+        # 1. coordinate systems
+        "## 1. Coordinate systems",
+        "World $\\{W\\}$",
+        "Camera 1 $\\{C_1\\}$",
+        "Camera 2 $\\{C_2\\}$",
+        # 1. pixel-coordinate origin is the image origin, not the principal point
+        "ordinary pixel coordinates",
+        "image origin (top-left pixel)",
+        "not the coordinate origin",
+        # 2. intrinsics + how calibration yields K
+        "f_x & s & c_x",
+        "principal point",
+        "skew",
+        "cv2.calibrateCamera",
+        # 3. camera 1 projection with R1 = I, t1 = 0 justified
+        "K_1\\,[\\,R_1 \\mid t_1\\,]",
+        "R_1 = I",
+        "t_1 = 0",
+        "loses no generality",
+        # 4. camera 2 transformation
+        "P_2 = R\\,P_1 + t",
+        "relative rotation",
+        "baseline length",
+        # 5. camera 2 projection
+        "K_2\\,[\\,R \\mid t\\,]",
+        "\\lambda_2 = (R\\,P_1 + t)_z",
+        # 6. relationship: epipolar, essential, fundamental
+        "epipolar line",
+        "E = [t]_\\times R",
+        # full 3-row skew-symmetric convention for [t]_x
+        "[t]_\\times = \\begin{bmatrix} 0 & -t_z & t_y \\\\ t_z & 0 & -t_x \\\\ -t_y & t_x & 0 \\end{bmatrix}",
+        "F = K_2^{-\\top} [t]_\\times R\\, K_1^{-1}",
+        "x_2^\\top F\\,x_1 = 0",
+        "epipole",
+        # 7. parameter classification table
+        "## 7. Parameters and variables",
+        "known / static",
+        "measured variable",
+        # 6.5 pure-translation disparity, consistent with P_2 = R P_1 + t
+        "P_2 = R\\,P_1 + t = P_1 + (b, 0, 0)^\\top",
+        "X_2 = X_1 + b",
+        "u_2 = u_1 + f\\,b/Z",
+        "The sign is **positive**",
+        # 8. assumptions
+        "## 8. Assumptions",
+        "Lens distortion removed",
+        # 8. cv2.undistortPoints(..., P=None) convention (matches src/module2/geometry.py)
+        "cv2.undistortPoints(pts, K, dist, P=None)",
+        "returns normalized\ncamera coordinates".replace("\n", " "),
+        "$K^{-1}$ must not be applied again",
+        "cv2.undistortPoints(pts, K, dist, P=K)",
+        "not the canonical\n   Module 2 path".replace("\n   ", " "),
+        # 9. example is labelled synthetic
+        "synthetic",
+        "not* measured",
+    ],
+)
+def test_covers_required_item(text: str, needle: str) -> None:
+    assert needle in text
+
+
+def test_no_stale_negative_disparity(text: str) -> None:
+    assert "u_2 = u_1 - f\\,b/Z" not in text
+    assert "u_2 = u_1 + f\\,b/Z" in text
+
+
+def test_undistortpoints_convention_is_explicit(text: str) -> None:
+    assert "cv2.undistortPoints(pts, K, dist, P=None)" in text
+    assert "returns normalized camera coordinates" in text
+    assert "$K^{-1}$ must not be applied again" in text
+    assert "not the canonical Module 2 path" in text
+    assert "src/module2/geometry.py" in text
+
+
+def test_pure_translation_disparity_sign_is_positive_under_P2_convention(text: str) -> None:
+    f, cx = 800.0, 320.0
+    b, Z = 60.0, 1000.0
+    P1 = np.array([40.0, 30.0, Z])
+    P2 = P1 + np.array([b, 0.0, 0.0])  # R = I, t = (b, 0, 0)  ->  P2 = R P1 + t
+    u1 = f * P1[0] / P1[2] + cx
+    u2 = f * P2[0] / P2[2] + cx
+    assert u2 == pytest.approx(u1 + f * b / Z)  # positive disparity
+    assert u2 > u1
+    assert "u_2 = u_1 + f\\,b/Z" in text
+    assert "X_2 = X_1 + b" in text
+
+
+def _bmatrices_after(text: str, marker: str) -> list[np.ndarray]:
+    """Every numeric ``\\begin{bmatrix}...\\end{bmatrix}`` that appears after ``marker``.
+
+    Symbolic matrices (entries that are not numbers) are skipped.
+    """
+    begin, end = r"\begin{bmatrix}", r"\end{bmatrix}"
+    out: list[np.ndarray] = []
+    pos = text.index(marker)
+    while True:
+        try:
+            b = text.index(begin, pos)
+        except ValueError:
+            return out
+        e = text.index(end, b)
+        body = text[b + len(begin) : e]
+        rows = [r for r in body.split(r"\\") if r.strip()]
+        try:
+            out.append(np.array([[float(c) for c in row.split("&")] for row in rows]))
+        except ValueError:
+            pass
+        pos = e + len(end)
+
+
+def test_worked_example_matches_recomputation(text: str) -> None:
+    K = np.array([[800.0, 0.0, 320.0], [0.0, 800.0, 240.0], [0.0, 0.0, 1.0]])
+    th = np.deg2rad(10.0)
+    R = np.array(
+        [[np.cos(th), 0.0, np.sin(th)], [0.0, 1.0, 0.0], [-np.sin(th), 0.0, np.cos(th)]]
+    )
+    t = np.array([-120.0, 0.0, -15.0])
+    P1 = np.array([40.0, 30.0, 1000.0])
+
+    u1 = K @ (P1 / P1[2])
+    P2 = R @ P1 + t
+    u2 = K @ (P2 / P2[2])
+    tx = np.array([[0, -t[2], t[1]], [t[2], 0, -t[0]], [-t[1], t[0], 0.0]])
+    E = tx @ R  # E = [t]_x R  (the document's chosen convention)
+    x1h, x2h = P1 / P1[2], P2 / P2[2]
+
+    # epipolar constraint holds for the stated point
+    assert abs(float(x2h @ E @ x1h)) < 1e-9
+
+    # printed scalar values match the recomputation
+    assert f"({u1[0]:.3f},\\ {u1[1]:.3f})" in text  # (352.000, 264.000)
+    assert f"({u2[0]:.4f},\\ {u2[1]:.4f})" in text  # (397.3033, 264.9257)
+
+    # the FULL rendered [t]_x and E matrices in section 9 must match, every row
+    rendered = _bmatrices_after(text, "**Essential matrix.**")
+    assert len(rendered) >= 2, "section 9 must render both [t]_x and E numerically"
+    rendered_tx, rendered_E = rendered[0], rendered[1]
+    assert rendered_tx.shape == (3, 3) and rendered_E.shape == (3, 3)
+    assert np.allclose(rendered_tx, tx, atol=1e-4)
+    assert np.allclose(rendered_E, E, atol=1e-4)
+
+
+def test_pure_translation_essential_matrix_matches_convention() -> None:
+    """For R = I, t = (b, 0, 0): E = [t]_x = [[0,0,0],[0,0,-b],[0,b,0]] (doc's convention)."""
+    b = 60.0
+    t = np.array([b, 0.0, 0.0])
+    tx = np.array([[0, -t[2], t[1]], [t[2], 0, -t[0]], [-t[1], t[0], 0.0]])
+    assert np.array_equal(tx, np.array([[0.0, 0.0, 0.0], [0.0, 0.0, -b], [0.0, b, 0.0]]))
+    assert np.array_equal(tx @ np.eye(3), tx)  # E = [t]_x when R = I
