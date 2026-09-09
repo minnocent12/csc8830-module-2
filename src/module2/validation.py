@@ -80,6 +80,10 @@ class ValidationSummary:
 
     ``width_stats`` / ``height_stats`` / ``combined_stats`` are ``None`` when no row was
     accepted (e.g. the template is still empty).
+
+    ``rejected`` holds rows that carried data but failed an acceptance gate. ``pending``
+    holds fully blank template rows — future trials that have not been run yet; they are
+    reported as pending, never as rejected/failed.
     """
 
     rows: list[MeasurementRow]
@@ -87,6 +91,7 @@ class ValidationSummary:
     height_stats: ErrorStatistics | None
     combined_stats: ErrorStatistics | None
     rejected: list[MeasurementRow] = field(default_factory=list)
+    pending: list[MeasurementRow] = field(default_factory=list)
 
 
 def _num(raw: dict[str, str], column: str, flags: list[str]) -> float:
@@ -160,6 +165,16 @@ def _is_blocking(flags: list[str]) -> bool:
     return any(f.startswith(_BLOCKING_PREFIXES) for f in flags)
 
 
+def _is_blank_placeholder(row: MeasurementRow) -> bool:
+    """True when every user-entered cell is empty.
+
+    Such a row is an unfilled slot for a future trial, not a measurement that was run and
+    rejected. It is reported as *pending* and kept out of both the accepted statistics and
+    the rejected list.
+    """
+    return all((row.source.get(column, "") or "").strip() == "" for column in INPUT_COLUMNS)
+
+
 def compute_errors(
     rows: list[MeasurementRow], calibration: CalibrationResult
 ) -> ValidationSummary:
@@ -168,8 +183,13 @@ def compute_errors(
     dist = calibration.dist_coeffs
     accepted: list[MeasurementRow] = []
     rejected: list[MeasurementRow] = []
+    pending: list[MeasurementRow] = []
 
     for row in rows:
+        if _is_blank_placeholder(row):
+            pending.append(row)
+            continue
+
         flags = list(row.flags)
         z = row.object_plane_depth_z_m
         if not math.isfinite(z) or z <= MIN_OBJECT_PLANE_DEPTH_M:
@@ -214,6 +234,7 @@ def compute_errors(
         height_stats=height_stats,
         combined_stats=combined_stats,
         rejected=rejected,
+        pending=pending,
     )
 
 
@@ -247,7 +268,9 @@ def to_filled_csv_text(summary: ValidationSummary) -> str:
 
     Re-running the analysis on the output therefore produces identical validation behaviour.
     """
-    ordered = sorted([*summary.rows, *summary.rejected], key=lambda r: r.index)
+    ordered = sorted(
+        [*summary.rows, *summary.rejected, *summary.pending], key=lambda r: r.index
+    )
     buffer = io.StringIO()
     writer = csv.DictWriter(buffer, fieldnames=list(TEMPLATE_COLUMNS))
     writer.writeheader()
@@ -294,15 +317,34 @@ def to_markdown_table(
     lines: list[str] = ["# Experimental validation — results", ""]
 
     if not summary.rows:
-        lines += [
-            "**No valid measurements.** Every row was rejected or the template is still "
-            "empty. Collect real data per `docs/validation_protocol.md` (object-plane depth "
-            "> 2 m, actual width/height > 0, all pixel points filled).",
-            "",
-        ]
+        if summary.pending and not summary.rejected:
+            lines += [
+                "**No valid measurements yet.** No completed trials — "
+                f"{len(summary.pending)} row(s) are pending (blank placeholders for trials "
+                "not yet run; not rejected). Collect real data per "
+                "`docs/validation_protocol.md` (object-plane depth > 2 m, actual "
+                "width/height > 0, all pixel points filled).",
+                "",
+            ]
+        else:
+            lines += [
+                "**No valid measurements.** Every row with data was rejected or the "
+                "template is still empty. Collect real data per "
+                "`docs/validation_protocol.md` (object-plane depth > 2 m, actual "
+                "width/height > 0, all pixel points filled).",
+                "",
+            ]
     else:
+        completed = len(summary.rows)
         lines += [
-            f"{len(summary.rows)} accepted measurement(s).",
+            f"{completed} completed trial(s)"
+            + (
+                f"; {len(summary.pending)} row(s) pending (future trials, not yet run)."
+                if summary.pending
+                else "."
+            ),
+            "",
+            f"{completed} accepted measurement(s).",
             "",
             "| id | object | Z (m) | actual W (mm) | est W (mm) | W abs err (mm) | W % | "
             "actual H (mm) | est H (mm) | H abs err (mm) | H % |",
@@ -319,9 +361,20 @@ def to_markdown_table(
                 f"{e['height_absolute_error_mm']:.2f} | {e['height_percentage_error']:.2f} |"
             )
         lines += ["", "## Error statistics", ""]
+        lines += [
+            f"From {completed} completed trial(s): width n = {summary.width_stats.n} "  # type: ignore[union-attr]
+            f"observation(s), height n = {summary.height_stats.n} observation(s). The "  # type: ignore[union-attr]
+            f"combined n = {summary.combined_stats.n} counts width and height observations "  # type: ignore[union-attr]
+            "together — it is a count of observations, not of trials.",
+            "",
+        ]
         lines += _stats_block("Width", summary.width_stats)  # type: ignore[arg-type]
         lines += _stats_block("Height", summary.height_stats)  # type: ignore[arg-type]
         lines += _stats_block("Combined (width + height)", summary.combined_stats)  # type: ignore[arg-type]
+        lines += [
+            "*(Combined n counts width and height observations, not trials.)*",
+            "",
+        ]
 
         if figures:
             lines += ["## Figures", ""]
@@ -329,10 +382,34 @@ def to_markdown_table(
                 lines += [f"![{caption}]({path})", ""]
 
     if summary.rejected:
-        lines += ["## Rejected rows", "", "| id | reason(s) |", "| -- | --------- |"]
+        lines += [
+            "## Rejected rows",
+            "",
+            "Rows that carried data but failed an acceptance gate (see "
+            "`docs/validation_protocol.md`).",
+            "",
+            "| id | reason(s) |",
+            "| -- | --------- |",
+        ]
         for r in summary.rejected:
             reasons = ", ".join(f for f in r.flags if f != "no_image_path") or "—"
             lines.append(f"| {r.measurement_id} | {reasons} |")
         lines.append("")
+
+    if summary.pending:
+        first_row = summary.pending[0].index + 1
+        last_row = summary.pending[-1].index + 1
+        span = (
+            str(first_row)
+            if first_row == last_row
+            else f"{first_row}–{last_row}"
+        )
+        lines += [
+            "## Pending rows",
+            "",
+            f"{len(summary.pending)} blank row(s) ({span}) are placeholders for trials not "
+            "yet run. They are **pending / unfilled**, not rejected, failed, or invalid.",
+            "",
+        ]
 
     return "\n".join(lines)
