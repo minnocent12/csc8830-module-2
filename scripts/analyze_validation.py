@@ -118,13 +118,13 @@ def _write_plots(summary: ValidationSummary, figures_dir: Path) -> list[Path]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Analyse a filled 20-trial measurement CSV."
+        description="Analyse a 20-trial measurement CSV."
     )
     parser.add_argument(
         "--measurements",
         type=Path,
-        default=REPO_ROOT / "results" / "measurements_template.csv",
-        help="filled measurement CSV (default: results/measurements_template.csv)",
+        default=REPO_ROOT / "results" / "measurements.csv",
+        help="measurement CSV (default: results/measurements.csv)",
     )
     parser.add_argument(
         "--calibration",
@@ -168,7 +168,11 @@ def main(argv: list[str] | None = None) -> int:
     filled_csv.parent.mkdir(parents=True, exist_ok=True)
     filled_csv.write_text(to_filled_csv_text(summary), newline="")
 
-    print(f"accepted: {len(summary.rows)}   rejected: {len(summary.rejected)}")
+    print(
+        f"completed trials: {len(summary.rows)}   "
+        f"pending (blank future rows): {len(summary.pending)}   "
+        f"rejected (had data, failed a gate): {len(summary.rejected)}"
+    )
     if summary.combined_stats is not None:
         s = summary.combined_stats
         print(
