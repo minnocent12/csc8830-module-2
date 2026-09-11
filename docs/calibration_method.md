@@ -1,10 +1,9 @@
 # Camera calibration — method
 
-> **PENDING USER CALIBRATION RUN — NOT MEASURED.** No calibration has been run yet. The
-> numerical results (camera matrix `K`, distortion coefficients, reprojection error) are
-> written to `results/calibration_report.md` and `data/calibration.json` by
-> `scripts/run_calibration.py` once it is run on real smartphone photographs. Nothing in
-> this repository fabricates those values.
+> Calibration was run on real smartphone photographs. The measured camera matrix `K`,
+> distortion coefficients, and reprojection error are reported in
+> `results/calibration_report.md`; `data/calibration.json` stores the same result in
+> machine-readable form. Nothing in this repository fabricates those values.
 
 ## Approach
 

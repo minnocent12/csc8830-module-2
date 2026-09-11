@@ -8,6 +8,15 @@ build/
 dist/
 .pytest_cache/
 
+# Accidental local virtualenv folders created during setup experiments
+# (kept out of the submission repository)
+\#/
+a/
+already/
+exists/
+from/
+setup/
+
 # Streamlit
 .streamlit/
 
@@ -28,3 +37,9 @@ results/*_filled.csv
 results/module2_report.md
 results/module2_report.pdf
 docs/report/figures/*.png
+results/*_cache*
+results/corner_cache.npz
+
+# Local point-selection review clutter
+results/*point_review*.png
+results/*_working_crops/
