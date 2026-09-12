@@ -1,10 +1,9 @@
 # Camera calibration — method
 
-> **PENDING USER CALIBRATION RUN — NOT MEASURED.** No calibration has been run yet. The
-> numerical results (camera matrix `K`, distortion coefficients, reprojection error) are
-> written to `results/calibration_report.md` and `data/calibration.json` by
-> `scripts/run_calibration.py` once it is run on real smartphone photographs. Nothing in
-> this repository fabricates those values.
+> Calibration was run on real smartphone photographs. The measured camera matrix `K`,
+> distortion coefficients, and reprojection error are included in the calibration-results
+> section of this final report. The repository contains the source scripts needed to
+> reproduce the workflow. Nothing in this repository fabricates those values.
 
 ## Approach
 
@@ -28,9 +27,11 @@ Standard OpenCV pinhole-model calibration:
 - Square edge length: **measured** with a ruler/calipers and passed as `--square-size-mm`;
   never assumed from the nominal print size.
 
-## What is recorded
+## Reproducibility outputs
 
-`data/calibration.json`:
+When `scripts/run_calibration.py` is run on the user's calibration photographs, it writes a
+machine-readable calibration JSON file and a Markdown calibration summary. The final measured
+values are included directly in this report.
 
 | Field | Meaning |
 | ----- | ------- |
@@ -43,14 +44,3 @@ Standard OpenCV pinhole-model calibration:
 | `rms_reprojection_error` | overall RMS reprojection error (pixels) |
 | `per_view_errors` | per-image RMS reprojection error (pixels) |
 | `used_images` / `failed_images` | image paths, detected vs not |
-
-## Run
-
-```
-python scripts/run_calibration.py \
-    --images-dir data/calibration_images \
-    --pattern 9x6 \
-    --square-size-mm <your measured value> \
-    --out data/calibration.json \
-    --report results/calibration_report.md
-```

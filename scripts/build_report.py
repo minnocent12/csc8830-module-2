@@ -1,15 +1,19 @@
-"""CLI: assemble the Module 2 report from its canonical sections (Markdown + optional PDF).
+"""CLI: assemble the Module 2 report from its canonical sections (Markdown + optional PDF
+and DOCX).
 
 Run from the repository root (or the ``Assignments/`` workspace root with ``Module_2/``
 prefixes)::
 
     python scripts/build_report.py
 
-Writes ``results/module2_report.md`` always. If ``pandoc`` (and a LaTeX engine) is
-installed it also renders ``results/module2_report.pdf``; otherwise it prints the exact
-pandoc command to run later. Section files that do not exist yet (e.g.
-``results/calibration_report.md`` before calibration) appear as a *pending* note — never
-fabricated content.
+Writes ``results/module2_report.md`` always. If ``pandoc`` is installed it also renders
+``results/module2_report.docx`` — pandoc's docx writer turns the report's LaTeX math
+(``$...$`` / ``$$...$$``) directly into native OOXML/Word equation objects, so this path
+needs **no** separate LaTeX engine. If ``pandoc`` **and** a LaTeX/PDF engine are both
+installed it additionally renders ``results/module2_report.pdf``. Whichever step is
+skipped prints the exact command to run later once the missing tool is installed. Section
+files that do not exist yet (e.g. ``results/calibration_report.md`` before calibration)
+appear as a *pending* note — never fabricated content.
 """
 from __future__ import annotations
 
@@ -66,6 +70,74 @@ def _pandoc_command(out_md: Path, out_pdf: Path, engine: str | None) -> list[str
     return cmd
 
 
+def _render_pdf(out_md: Path, out_pdf: Path, pandoc: str | None) -> int:
+    """Render the PDF via pandoc + a detected LaTeX/PDF engine.
+
+    Returns 0 both on success and on a graceful skip (pandoc or an engine missing — the
+    exact retry command is printed instead); a pandoc subprocess failure returns pandoc's
+    exit code so the caller can stop and surface it.
+    """
+    engine = _select_pdf_engine()
+    later_cmd = " ".join(_pandoc_command(out_md, out_pdf, engine))
+
+    if pandoc is None:
+        print(
+            "pandoc not found — Markdown only. Install pandoc + a LaTeX engine, then run:\n"
+            f"  {later_cmd}"
+        )
+        return 0
+    if engine is None:
+        print(
+            "pandoc found, but no LaTeX/PDF engine is on PATH — PDF skipped. Install a "
+            "LaTeX engine supported by pandoc (e.g. TeX Live or MiKTeX), then run:\n"
+            f"  {later_cmd}"
+        )
+        return 0
+
+    cmd = _pandoc_command(out_md, out_pdf, engine)
+    cmd[0] = pandoc  # use the resolved pandoc path for execution
+    try:
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError as exc:
+        print(
+            f"pandoc failed ({exc.returncode}) building the PDF; the Markdown is at "
+            f"{out_md}. Retry with:\n  {later_cmd}"
+        )
+        return exc.returncode
+    print(f"wrote {out_pdf}")
+    return 0
+
+
+def _render_docx(out_md: Path, out_docx: Path, pandoc: str | None) -> int:
+    """Render the .docx via pandoc alone.
+
+    Unlike the PDF path, this needs **no** LaTeX/PDF engine: pandoc's native docx writer
+    turns the report's LaTeX math (the default markdown reader's ``tex_math_dollars``
+    extension) directly into OOXML ``<m:oMath>`` Word equation objects. It therefore does
+    not call ``_select_pdf_engine()`` at all, and re-uses ``_pandoc_command`` with
+    ``engine=None`` (no ``--pdf-engine`` flag) since the resulting argv is identical to
+    what a docx conversion needs.
+    """
+    cmd = _pandoc_command(out_md, out_docx, engine=None)
+    later_cmd = " ".join(cmd)
+
+    if pandoc is None:
+        print(f"pandoc not found — .docx skipped. Install pandoc, then run:\n  {later_cmd}")
+        return 0
+
+    cmd[0] = pandoc
+    try:
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError as exc:
+        print(
+            f"pandoc failed ({exc.returncode}) building the .docx; the Markdown is at "
+            f"{out_md}. Retry with:\n  {later_cmd}"
+        )
+        return exc.returncode
+    print(f"wrote {out_docx}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Assemble the Module 2 report from its canonical section files."
@@ -82,8 +154,10 @@ def main(argv: list[str] | None = None) -> int:
         "--out-pdf", type=Path, default=REPO_ROOT / "results" / "module2_report.pdf"
     )
     parser.add_argument(
-        "--no-pdf", action="store_true", help="assemble the Markdown only"
+        "--out-docx", type=Path, default=REPO_ROOT / "results" / "module2_report.docx"
     )
+    parser.add_argument("--no-pdf", action="store_true", help="skip PDF rendering")
+    parser.add_argument("--no-docx", action="store_true", help="skip .docx rendering")
     args = parser.parse_args(argv)
 
     markdown = assemble_report(args.manifest, REPO_ROOT)
@@ -91,38 +165,18 @@ def main(argv: list[str] | None = None) -> int:
     args.out_md.write_text(markdown, encoding="utf-8")
     print(f"wrote {args.out_md}  ({len(markdown.splitlines())} lines)")
 
-    if args.no_pdf:
-        return 0
-
     pandoc = shutil.which("pandoc")
-    engine = _select_pdf_engine()
-    later_cmd = " ".join(_pandoc_command(args.out_md, args.out_pdf, engine))
 
-    if pandoc is None:
-        print(
-            "pandoc not found — Markdown only. Install pandoc + a LaTeX engine, then run:\n"
-            f"  {later_cmd}"
-        )
-        return 0
-    if engine is None:
-        print(
-            "pandoc found, but no LaTeX/PDF engine is on PATH — Markdown only. Install a "
-            "LaTeX engine supported by pandoc (e.g. TeX Live or MiKTeX), then run:\n"
-            f"  {later_cmd}"
-        )
-        return 0
+    if not args.no_pdf:
+        rc = _render_pdf(args.out_md, args.out_pdf, pandoc)
+        if rc != 0:
+            return rc
 
-    cmd = _pandoc_command(args.out_md, args.out_pdf, engine)
-    cmd[0] = pandoc  # use the resolved pandoc path for execution
-    try:
-        subprocess.run(cmd, check=True)
-    except subprocess.CalledProcessError as exc:
-        print(
-            f"pandoc failed ({exc.returncode}); the Markdown is at {args.out_md}. "
-            f"Retry with:\n  {later_cmd}"
-        )
-        return exc.returncode
-    print(f"wrote {args.out_pdf}")
+    if not args.no_docx:
+        rc = _render_docx(args.out_md, args.out_docx, pandoc)
+        if rc != 0:
+            return rc
+
     return 0
 
 
