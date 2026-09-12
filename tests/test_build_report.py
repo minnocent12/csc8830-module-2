@@ -127,7 +127,9 @@ def test_cli_with_pandoc_but_no_pdf_engine_exits_zero_with_recovery_command(
     monkeypatch.setattr(cli.subprocess, "run", _fail_run)
     out_md = tmp_path / "report.md"
     out_pdf = tmp_path / "report.pdf"
-    rc = cli.main(["--out-md", str(out_md), "--out-pdf", str(out_pdf)])
+    # --no-docx isolates this to the PDF path; the .docx path needs no engine at all and is
+    # covered separately below.
+    rc = cli.main(["--no-docx", "--out-md", str(out_md), "--out-pdf", str(out_pdf)])
     assert rc == 0
     assert out_md.is_file()
     out = capsys.readouterr().out
@@ -145,9 +147,80 @@ def test_cli_no_pdf_flag_skips_rendering(
 
     monkeypatch.setattr(cli.subprocess, "run", _boom)
     out_md = tmp_path / "report.md"
-    rc = cli.main(["--no-pdf", "--out-md", str(out_md), "--out-pdf", str(tmp_path / "r.pdf")])
+    # --no-docx too: this test is only about --no-pdf; docx's own skip flag is covered below.
+    rc = cli.main(
+        ["--no-pdf", "--no-docx", "--out-md", str(out_md), "--out-pdf", str(tmp_path / "r.pdf")]
+    )
     assert rc == 0
     assert out_md.is_file()
+
+
+def test_cli_no_docx_flag_skips_rendering(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cli = _load_build_report()
+
+    def _boom(*_a: object, **_k: object) -> None:
+        raise AssertionError("no .docx work expected with --no-docx")
+
+    monkeypatch.setattr(cli.subprocess, "run", _boom)
+    out_md = tmp_path / "report.md"
+    # --no-pdf too: isolates this test to --no-docx alone.
+    rc = cli.main(
+        ["--no-pdf", "--no-docx", "--out-md", str(out_md), "--out-docx", str(tmp_path / "r.docx")]
+    )
+    assert rc == 0
+    assert out_md.is_file()
+
+
+def test_cli_renders_docx_without_needing_a_pdf_engine(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The .docx path must succeed even when no LaTeX/PDF engine exists at all — pandoc's
+    docx writer needs no engine, unlike the PDF path."""
+    cli = _load_build_report()
+    # pandoc present; every PDF engine absent
+    monkeypatch.setattr(
+        cli.shutil, "which", lambda name: "/usr/bin/pandoc" if name == "pandoc" else None
+    )
+    recorded: dict[str, list[str]] = {}
+    monkeypatch.setattr(
+        cli.subprocess, "run", lambda cmd, **_k: recorded.setdefault("cmd", list(cmd))
+    )
+    out_md, out_docx = tmp_path / "r.md", tmp_path / "r.docx"
+
+    rc = cli.main(["--no-pdf", "--out-md", str(out_md), "--out-docx", str(out_docx)])
+
+    assert rc == 0
+    cmd = recorded["cmd"]
+    assert cmd[0] == "/usr/bin/pandoc"
+    assert "--pdf-engine=" not in " ".join(cmd)  # no engine flag — none is needed for docx
+    assert str(out_docx) in cmd
+    assert f"--resource-path={cli._RESOURCE_PATH}" in cmd
+    assert f"wrote {out_docx}" in capsys.readouterr().out
+
+
+def test_cli_surfaces_pandoc_conversion_failure_for_docx(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    cli = _load_build_report()
+    monkeypatch.setattr(
+        cli.shutil, "which", lambda name: "/usr/bin/pandoc" if name == "pandoc" else None
+    )
+
+    def _boom(cmd: list[str], **_k: object) -> None:
+        raise cli.subprocess.CalledProcessError(returncode=5, cmd=cmd)
+
+    monkeypatch.setattr(cli.subprocess, "run", _boom)
+    out_md, out_docx = tmp_path / "r.md", tmp_path / "r.docx"
+
+    rc = cli.main(["--no-pdf", "--out-md", str(out_md), "--out-docx", str(out_docx)])
+
+    assert rc == 5  # failure is not hidden
+    assert out_md.is_file()  # Markdown left intact
+    out = capsys.readouterr().out
+    assert "pandoc failed (5)" in out
+    assert "Retry with" in out
 
 
 def test_cli_invokes_pandoc_with_the_detected_pdf_engine(
