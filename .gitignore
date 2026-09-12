@@ -33,9 +33,11 @@ data/experiments/*
 data/calibration.json
 results/calibration_report.md
 results/validation_summary.md
+results/measurements.csv
 results/*_filled.csv
 results/module2_report.md
 results/module2_report.pdf
+results/module2_report.docx
 docs/report/figures/*.png
 results/*_cache*
 results/corner_cache.npz
