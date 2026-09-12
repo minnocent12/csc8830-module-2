@@ -1,7 +1,7 @@
 """Image input/output helpers.
 
 Every function returns new arrays or paths; original image files and in-memory arrays are
-never modified in place (the "preservation of original images/data" rule in AGENTS.md).
+never modified in place.
 """
 from __future__ import annotations
 
