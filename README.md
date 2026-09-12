@@ -24,8 +24,10 @@ Dimension Estimation, Validation Analysis, Theory. Stop it with `Ctrl+C`; leave 
 environment with `deactivate`.
 
 Needs **Python 3.10+**. Run the test suite any time with `pytest -q` (all green on a fresh
-install). The report **PDF** step (only) also needs `pandoc` and a LaTeX engine supported by
-pandoc — everything else works without them.
+install). The report-building step (only) also needs `pandoc`: with `pandoc` alone it
+renders `results/module2_report.docx` (pandoc turns the report's math directly into native
+Word equations — no LaTeX engine needed); the **PDF** additionally needs a LaTeX engine
+supported by pandoc. Everything else works without either.
 
 ## Web application
 
@@ -97,11 +99,14 @@ Run these from the repository root with the venv active.
    ```bash
    python scripts/build_report.py
    ```
-   `results/module2_report.md` is **always** written. `results/module2_report.pdf` is
-   produced only when **both `pandoc` and a LaTeX engine supported by pandoc** are
-   installed; if either is missing the script leaves the Markdown report intact and prints
-   the exact `pandoc` command to run later. Sections you have not generated yet appear as
-   *pending* notes.
+   `results/module2_report.md` is **always** written. `results/module2_report.docx` is
+   produced whenever **`pandoc`** is installed — pandoc's docx writer converts the report's
+   LaTeX math directly into native Word equation objects, so no LaTeX engine is needed for
+   this step. `results/module2_report.pdf` is produced only when **both `pandoc` and a
+   LaTeX engine supported by pandoc** are installed. If either tool is missing for a given
+   format, the script leaves the Markdown report intact and prints the exact `pandoc`
+   command to run later (`--no-docx` / `--no-pdf` skip a format on purpose). Sections you
+   have not generated yet appear as *pending* notes.
 
 ## Known limitations
 
