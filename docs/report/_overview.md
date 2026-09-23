@@ -2,6 +2,8 @@
 
 **GitHub repository:** <https://github.com/minnocent12/csc8830-module-2>
 
+**Public web app (all modules):** <https://csc8830-dashboard-minnocent1.streamlit.app>
+
 ## Problem
 
 Estimate the real-world width and height of a planar object from a single smartphone
