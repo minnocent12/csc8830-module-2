@@ -15,6 +15,11 @@ def pending_experiment_banner(detail: str | None = None) -> None:
     st.warning(PENDING_BANNER if detail is None else f"{PENDING_BANNER}\n\n{detail}")
 
 
+def bundled_sample_notice(detail: str) -> None:
+    """Show the standard 'showing a bundled real sample; upload your own to override' notice."""
+    st.info(detail)
+
+
 def placeholder_page(name: str, phase: str) -> None:
     """Render a 'not implemented yet' stub for a page a later phase will build."""
     st.header(name)
