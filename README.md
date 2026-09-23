@@ -1,5 +1,7 @@
 # CSc 8830 — Module 2: Camera Calibration & 2D Object Dimension Estimation
 
+**Public web app (all modules):** <https://csc8830-dashboard-minnocent1.streamlit.app>
+
 Smartphone camera calibration (OpenCV) and real-world 2D object dimension estimation by
 perspective back-projection, with a Streamlit app, a 20-trial experimental-validation
 workflow, and a two-camera projection theory write-up.
@@ -40,9 +42,10 @@ supported by pandoc. Everything else works without either.
 | Validation Analysis | load the 20-trial CSV; per-row and width / height / combined error statistics |
 | Theory | the two-camera projection derivation |
 
-Deploy for the instructor: a hosted Streamlit URL is preferred if available (e.g. Streamlit
-Community Cloud pointed at `app.py`); otherwise the exact local steps above plus the demo
-video are sufficient. Record the URL or steps in the final PDF.
+Deployed for the instructor at <https://csc8830-dashboard-minnocent1.streamlit.app>, a
+combined dashboard hosting Module 2, 3, and 4 (Streamlit Community Cloud, `Module` dropdown
+in the sidebar). The local steps above remain the recommended path for grading this repository
+standalone.
 
 ## Layout
 
