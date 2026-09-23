@@ -20,10 +20,22 @@ import streamlit as st
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _DOCS_DIR = _REPO_ROOT / "docs"
+_SAMPLE_DIR = _REPO_ROOT / "data" / "sample_images"
+_SAMPLE_CALIBRATION_DIR = _SAMPLE_DIR / "calibration"
+_SAMPLE_CALIBRATION_JSON = _SAMPLE_DIR / "calibration.json"
+_SAMPLE_EXPERIMENT_IMAGE = _SAMPLE_DIR / "experiment.JPG"
+_SAMPLE_MEASUREMENTS_CSV = _SAMPLE_DIR / "measurements_sample.csv"
+
+# Real pixel points (row 1 of the bundled measurements sample) for the object in
+# data/sample_images/experiment.JPG — used only to prefill the Estimation page demo so it
+# shows an accurate result with no interaction; the visitor can change them freely.
+_SAMPLE_WIDTH_POINTS = (1895.5, 2690.0, 2058.0, 2690.0)
+_SAMPLE_HEIGHT_POINTS = (1976.5, 2435.0, 1976.5, 2945.0)
+_SAMPLE_DEPTH_M = 2.2
 
 from module2 import calibration as calib
 from module2.dimension_estimation import estimate_width_height
-from module2.io_utils import decode_image_bgr
+from module2.io_utils import decode_image_bgr, load_image_bgr
 from module2.units import metres_to_mm
 from module2.validation import (
     compute_errors,
@@ -32,10 +44,17 @@ from module2.validation import (
     to_markdown_table,
 )
 from module2.webapp._page import PageSpec
-from module2.webapp.ui import pending_experiment_banner, placeholder_page
+from module2.webapp.ui import bundled_sample_notice, pending_experiment_banner, placeholder_page
 
 _MODULE = "Module 2"
 _IMAGE_TYPES = ["jpg", "jpeg", "png", "bmp", "tif", "tiff"]
+
+
+def _sample_calibration_images() -> list[Path]:
+    """Bundled real chessboard photos (a downscaled subset of the actual capture set)."""
+    if not _SAMPLE_CALIBRATION_DIR.is_dir():
+        return []
+    return sorted(_SAMPLE_CALIBRATION_DIR.glob("*.JPG"))
 
 
 def _calibration_page() -> None:
@@ -59,26 +78,41 @@ def _calibration_page() -> None:
     uploads = st.file_uploader(
         "Chessboard images", type=_IMAGE_TYPES, accept_multiple_files=True
     )
-    if not uploads:
-        pending_experiment_banner(
-            "Upload 15–25 chessboard photos taken with your smartphone to run calibration."
+
+    using_sample = False
+    if uploads:
+        sources: list[tuple[str, bytes]] = [(f.name, f.getvalue()) for f in uploads]
+    else:
+        sample_paths = _sample_calibration_images()
+        if not sample_paths:
+            pending_experiment_banner(
+                "Upload 15–25 chessboard photos taken with your smartphone to run calibration."
+            )
+            return
+        using_sample = True
+        sources = [(p.name, p.read_bytes()) for p in sample_paths]
+        bundled_sample_notice(
+            f"No photos uploaded — showing a live demo recalibration on {len(sources)} "
+            "bundled real chessboard photos (a downscaled subset of the actual capture set). "
+            "This recomputes K, distortion, and reprojection error live from these images, so "
+            "it differs slightly from the full 16-image submitted result in "
+            "`results/calibration_report.md`. Upload your own photos to override."
         )
-        return
 
     grays: list[np.ndarray] = []
     names: list[str] = []
     previews: list[tuple[str, np.ndarray, np.ndarray | None]] = []
-    for f in uploads:
+    for name, data in sources:
         try:
-            bgr = decode_image_bgr(f.getvalue())
+            bgr = decode_image_bgr(data)
         except ValueError:
-            st.warning(f"{f.name}: could not decode as an image — skipped.")
+            st.warning(f"{name}: could not decode as an image — skipped.")
             continue
         gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
         corners = calib.find_chessboard_corners(gray, pattern_size)
         grays.append(gray)
-        names.append(f.name)
-        previews.append((f.name, bgr, corners))
+        names.append(name)
+        previews.append((name, bgr, corners))
 
     detected = sum(1 for _, _, c in previews if c is not None)
     st.caption(f"Chessboard detected in {detected} / {len(previews)} images.")
@@ -99,7 +133,7 @@ def _calibration_page() -> None:
                     use_container_width=True,
                 )
 
-    if not st.button("Run calibration", type="primary"):
+    if not using_sample and not st.button("Run calibration", type="primary"):
         return
 
     try:
@@ -163,21 +197,36 @@ def _estimation_page() -> None:
 
     image_file = st.file_uploader("Object image (raw, undistorted-free)", type=_IMAGE_TYPES)
     calib_file = st.file_uploader("calibration.json", type=["json"])
-    if image_file is None or calib_file is None:
+
+    using_sample = False
+    default_width_pts: tuple[float, float, float, float] | None = None
+    default_height_pts: tuple[float, float, float, float] | None = None
+    if image_file is not None and calib_file is not None:
+        try:
+            bgr = decode_image_bgr(image_file.getvalue())
+        except ValueError:
+            st.error("Could not decode the image.")
+            return
+        try:
+            calibration = calib.calibration_from_dict(json.loads(calib_file.getvalue()))
+        except (ValueError, KeyError, json.JSONDecodeError) as exc:
+            st.error(f"Could not read calibration.json: {exc}")
+            return
+    elif _SAMPLE_EXPERIMENT_IMAGE.is_file() and _SAMPLE_CALIBRATION_JSON.is_file():
+        using_sample = True
+        bgr = load_image_bgr(_SAMPLE_EXPERIMENT_IMAGE)
+        calibration = calib.load_calibration(_SAMPLE_CALIBRATION_JSON)
+        default_width_pts = _SAMPLE_WIDTH_POINTS
+        default_height_pts = _SAMPLE_HEIGHT_POINTS
+        bundled_sample_notice(
+            "No upload — showing a live demo on one bundled real photo and the real "
+            "16-image submitted calibration.json, with the points pre-filled at the actual "
+            "measured location. Upload your own image and calibration.json to override."
+        )
+    else:
         pending_experiment_banner(
             "Upload the object image and the calibration.json produced on the Calibration page."
         )
-        return
-
-    try:
-        bgr = decode_image_bgr(image_file.getvalue())
-    except ValueError:
-        st.error("Could not decode the image.")
-        return
-    try:
-        calibration = calib.calibration_from_dict(json.loads(calib_file.getvalue()))
-    except (ValueError, KeyError, json.JSONDecodeError) as exc:
-        st.error(f"Could not read calibration.json: {exc}")
         return
 
     h, w = bgr.shape[:2]
@@ -187,7 +236,7 @@ def _estimation_page() -> None:
         st.number_input(
             "Object-plane depth Z along the optical axis (metres)",
             min_value=0.1,
-            value=2.5,
+            value=_SAMPLE_DEPTH_M if using_sample else 2.5,
             step=0.05,
             format="%.2f",
         )
@@ -195,10 +244,12 @@ def _estimation_page() -> None:
     if distance_m <= 2.0:
         st.info("Step 3 validation requires the object-plane depth to exceed 2 m.")
 
-    width_pts = _point_inputs("Width", (w * 0.25, h * 0.5, w * 0.75, h * 0.5))
-    height_pts = _point_inputs("Height", (w * 0.5, h * 0.25, w * 0.5, h * 0.75))
+    width_pts = _point_inputs("Width", default_width_pts or (w * 0.25, h * 0.5, w * 0.75, h * 0.5))
+    height_pts = _point_inputs(
+        "Height", default_height_pts or (w * 0.5, h * 0.25, w * 0.5, h * 0.75)
+    )
 
-    if not st.button("Estimate dimensions", type="primary"):
+    if not using_sample and not st.button("Estimate dimensions", type="primary"):
         return
 
     for name, pts in (("Width", width_pts), ("Height", height_pts)):
@@ -244,18 +295,28 @@ def _validation_page() -> None:
 
     csv_file = st.file_uploader("Measurements CSV (from measurements_template.csv)", type=["csv"])
     calib_file = st.file_uploader("calibration.json", type=["json"])
-    if csv_file is None or calib_file is None:
+
+    if csv_file is not None and calib_file is not None:
+        try:
+            rows = parse_measurements_text(csv_file.getvalue().decode("utf-8"))
+            calibration = calib.calibration_from_dict(json.loads(calib_file.getvalue()))
+        except (ValueError, KeyError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+            st.error(f"Could not read inputs: {exc}")
+            return
+    elif _SAMPLE_MEASUREMENTS_CSV.is_file() and _SAMPLE_CALIBRATION_JSON.is_file():
+        rows = parse_measurements_text(_SAMPLE_MEASUREMENTS_CSV.read_text(encoding="utf-8"))
+        calibration = calib.load_calibration(_SAMPLE_CALIBRATION_JSON)
+        bundled_sample_notice(
+            "No upload — showing 5 real rows from the actual 20-trial measurement set (a "
+            "bundled subset) against the real submitted calibration.json. The full 20-row "
+            "result is in `results/validation_summary.md`. Upload your own CSV and "
+            "calibration.json to override."
+        )
+    else:
         pending_experiment_banner(
             "Upload your filled measurements CSV and calibration.json. No data is present "
             "until you collect the 20 real measurements."
         )
-        return
-
-    try:
-        rows = parse_measurements_text(csv_file.getvalue().decode("utf-8"))
-        calibration = calib.calibration_from_dict(json.loads(calib_file.getvalue()))
-    except (ValueError, KeyError, json.JSONDecodeError, UnicodeDecodeError) as exc:
-        st.error(f"Could not read inputs: {exc}")
         return
 
     summary = compute_errors(rows, calibration)

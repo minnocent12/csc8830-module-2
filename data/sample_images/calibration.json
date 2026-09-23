@@ -1,0 +1,76 @@
+{
+  "camera_matrix": [
+    [
+      3989.3437383004334,
+      0.0,
+      2092.3099890418753
+    ],
+    [
+      0.0,
+      3981.846229114595,
+      2856.088216423201
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "dist_coeffs": [
+    0.18252594086233095,
+    -0.780868324173897,
+    -0.0031625201519496324,
+    -0.0029904099937817577,
+    0.8193170026005481
+  ],
+  "image_size": [
+    4284,
+    5712
+  ],
+  "pattern_size": [
+    9,
+    6
+  ],
+  "square_size_mm": 25.0,
+  "num_images": 16,
+  "rms_reprojection_error": 1.8531894502483754,
+  "per_view_errors": [
+    1.0017590105108507,
+    0.7043563088780986,
+    1.6364612962737908,
+    0.5990578847428132,
+    0.3825430880756316,
+    1.9658947595211562,
+    2.1259293976353875,
+    2.523042758022793,
+    2.178701395828011,
+    2.164041582501969,
+    1.7687682352617833,
+    2.5101019787718504,
+    2.086867349835995,
+    2.2688958411192797,
+    1.9118265408143118,
+    1.8706151511418414
+  ],
+  "used_images": [
+    "/Users/mirengeinnocent/Desktop/Fall_2026/CSC_8830_computer_vision/Assignments/Module_2/data/calibration_images/IMG_7039.JPG",
+    "/Users/mirengeinnocent/Desktop/Fall_2026/CSC_8830_computer_vision/Assignments/Module_2/data/calibration_images/IMG_7040.JPG",
+    "/Users/mirengeinnocent/Desktop/Fall_2026/CSC_8830_computer_vision/Assignments/Module_2/data/calibration_images/IMG_7041.JPG",
+    "/Users/mirengeinnocent/Desktop/Fall_2026/CSC_8830_computer_vision/Assignments/Module_2/data/calibration_images/IMG_7042.JPG",
+    "/Users/mirengeinnocent/Desktop/Fall_2026/CSC_8830_computer_vision/Assignments/Module_2/data/calibration_images/IMG_7043.JPG",
+    "/Users/mirengeinnocent/Desktop/Fall_2026/CSC_8830_computer_vision/Assignments/Module_2/data/calibration_images/IMG_7045.JPG",
+    "/Users/mirengeinnocent/Desktop/Fall_2026/CSC_8830_computer_vision/Assignments/Module_2/data/calibration_images/IMG_7046.JPG",
+    "/Users/mirengeinnocent/Desktop/Fall_2026/CSC_8830_computer_vision/Assignments/Module_2/data/calibration_images/IMG_7047.JPG",
+    "/Users/mirengeinnocent/Desktop/Fall_2026/CSC_8830_computer_vision/Assignments/Module_2/data/calibration_images/IMG_7048.JPG",
+    "/Users/mirengeinnocent/Desktop/Fall_2026/CSC_8830_computer_vision/Assignments/Module_2/data/calibration_images/IMG_7049.JPG",
+    "/Users/mirengeinnocent/Desktop/Fall_2026/CSC_8830_computer_vision/Assignments/Module_2/data/calibration_images/IMG_7051.JPG",
+    "/Users/mirengeinnocent/Desktop/Fall_2026/CSC_8830_computer_vision/Assignments/Module_2/data/calibration_images/IMG_7052.JPG",
+    "/Users/mirengeinnocent/Desktop/Fall_2026/CSC_8830_computer_vision/Assignments/Module_2/data/calibration_images/IMG_7055.JPG",
+    "/Users/mirengeinnocent/Desktop/Fall_2026/CSC_8830_computer_vision/Assignments/Module_2/data/calibration_images/IMG_7056.JPG",
+    "/Users/mirengeinnocent/Desktop/Fall_2026/CSC_8830_computer_vision/Assignments/Module_2/data/calibration_images/IMG_7057.JPG",
+    "/Users/mirengeinnocent/Desktop/Fall_2026/CSC_8830_computer_vision/Assignments/Module_2/data/calibration_images/IMG_7060.JPG"
+  ],
+  "failed_images": [],
+  "created_utc": "2026-09-08T17:04:34+00:00",
+  "opencv_version": "5.0.0"
+}
