@@ -7,6 +7,7 @@ from typing import Sequence
 import streamlit as st
 
 from module2.webapp._page import PageSpec
+from module2.webapp.design import inject_global_styles
 
 
 def render_app(pages: Sequence[PageSpec], *, title: str = "CSc 8830 — Module 2") -> None:
@@ -17,6 +18,7 @@ def render_app(pages: Sequence[PageSpec], *, title: str = "CSc 8830 — Module 2
         title: page/tab title for the app.
     """
     st.set_page_config(page_title=title, layout="wide")
+    inject_global_styles()
 
     if not pages:
         st.error("No pages registered.")
