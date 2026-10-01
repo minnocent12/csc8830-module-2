@@ -50,7 +50,7 @@ standalone.
 ### Visual theme
 
 `src/module2/webapp/design/` and `.streamlit/config.toml` are generated copies of the shared
-[csc8830-ui](https://github.com/minnocent12/csc8830-ui) design kit (`KIT_VERSION` 0.4.0), including its shared
+[csc8830-ui](https://github.com/minnocent12/csc8830-ui) design kit (`KIT_VERSION` 0.5.0), including its shared
 components in `webapp/design/components/` and the shared app shell that
 `webapp/shell.py` delegates to.
 Do not edit them by hand; they are refreshed from that repository with its
