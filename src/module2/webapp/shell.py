@@ -1,38 +1,16 @@
-"""Streamlit rendering shell: turn a list of pages into a sidebar-navigated app."""
+"""Streamlit shell for the Module 2 app: a thin adapter over the shared csc8830-ui shell.
+
+Navigation, identity, breadcrumbs, and footer come from ``module2.webapp.design.shell``,
+a vendored copy of the course design kit. This module only states what is specific here.
+"""
 from __future__ import annotations
 
-from collections import defaultdict
-from typing import Sequence
-
-import streamlit as st
+from collections.abc import Sequence
 
 from module2.webapp._page import PageSpec
-from module2.webapp.design import inject_global_styles
+from module2.webapp.design.shell import render_shell
 
 
 def render_app(pages: Sequence[PageSpec], *, title: str = "CSc 8830 — Module 2") -> None:
-    """Render a sidebar of ``pages`` grouped by module label and dispatch to the selection.
-
-    Args:
-        pages: the pages to expose, already ordered (see :func:`module2.webapp.registry.collect_pages`).
-        title: page/tab title for the app.
-    """
-    st.set_page_config(page_title=title, layout="wide")
-    inject_global_styles()
-
-    if not pages:
-        st.error("No pages registered.")
-        return
-
-    by_module: dict[str, list[PageSpec]] = defaultdict(list)
-    for page in pages:
-        by_module[page.module_label].append(page)
-
-    with st.sidebar:
-        st.title(title)
-        module_label = st.selectbox("Module", list(by_module))
-        module_pages = by_module[module_label]
-        page_label = st.radio("Page", [p.page_label for p in module_pages])
-
-    selected = next(p for p in module_pages if p.page_label == page_label)
-    selected.render()
+    """Render the standalone Module 2 app around the selected page."""
+    render_shell(pages, page_title=title, standalone=True)
