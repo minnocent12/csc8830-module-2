@@ -47,6 +47,15 @@ combined dashboard hosting Module 2, 3, and 4 (Streamlit Community Cloud, `Modul
 in the sidebar). The local steps above remain the recommended path for grading this repository
 standalone.
 
+### Visual theme
+
+`src/module2/webapp/design/` and `.streamlit/config.toml` are generated copies of the shared
+[csc8830-ui](https://github.com/minnocent12/csc8830-ui) design kit (`KIT_VERSION` 0.2.0).
+Do not edit them by hand; they are refreshed from that repository with its
+`scripts/vendor.py`. The app needs nothing from csc8830-ui at runtime, and
+`tests/test_design_theme.py` checks that the config still matches the vendored kit.
+Requires `streamlit>=1.49,<2`.
+
 ## Layout
 
 ```

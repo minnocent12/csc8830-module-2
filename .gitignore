@@ -18,7 +18,9 @@ from/
 setup/
 
 # Streamlit
-.streamlit/
+.streamlit/*
+!.streamlit/config.toml
+.streamlit/secrets.toml
 
 # OS
 .DS_Store
