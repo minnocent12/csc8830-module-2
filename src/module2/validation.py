@@ -314,24 +314,22 @@ def to_markdown_table(
     ``scripts/build_report.py`` resolves via pandoc ``--resource-path=docs/report``. When
     ``figures`` is omitted (e.g. the Streamlit preview) no image links are emitted.
     """
-    lines: list[str] = ["# Experimental validation — results", ""]
+    lines: list[str] = ["# Experimental validation: results", ""]
 
     if not summary.rows:
         if summary.pending and not summary.rejected:
             lines += [
-                "**No valid measurements yet.** No completed trials — "
+                "**No valid measurements yet.** No completed trials: "
                 f"{len(summary.pending)} row(s) are pending (blank placeholders for trials "
-                "not yet run; not rejected). Collect real data per "
-                "`docs/validation_protocol.md` (object-plane depth > 2 m, actual "
-                "width/height > 0, all pixel points filled).",
+                "not yet run; not rejected). Collect real data with object-plane depth "
+                "> 2 m, actual width/height > 0, and all pixel points filled.",
                 "",
             ]
         else:
             lines += [
                 "**No valid measurements.** Every row with data was rejected or the "
-                "template is still empty. Collect real data per "
-                "`docs/validation_protocol.md` (object-plane depth > 2 m, actual "
-                "width/height > 0, all pixel points filled).",
+                "template is still empty. Collect real data with object-plane depth "
+                "> 2 m, actual width/height > 0, and all pixel points filled.",
                 "",
             ]
     else:
@@ -365,7 +363,7 @@ def to_markdown_table(
             f"From {completed} completed trial(s): width n = {summary.width_stats.n} "  # type: ignore[union-attr]
             f"observation(s), height n = {summary.height_stats.n} observation(s). The "  # type: ignore[union-attr]
             f"combined n = {summary.combined_stats.n} counts width and height observations "  # type: ignore[union-attr]
-            "together — it is a count of observations, not of trials.",
+            "together; it is a count of observations, not of trials.",
             "",
         ]
         lines += _stats_block("Width", summary.width_stats)  # type: ignore[arg-type]
@@ -385,14 +383,13 @@ def to_markdown_table(
         lines += [
             "## Rejected rows",
             "",
-            "Rows that carried data but failed an acceptance gate (see "
-            "`docs/validation_protocol.md`).",
+            "Rows that carried data but failed an acceptance gate.",
             "",
             "| id | reason(s) |",
             "| -- | --------- |",
         ]
         for r in summary.rejected:
-            reasons = ", ".join(f for f in r.flags if f != "no_image_path") or "—"
+            reasons = ", ".join(f for f in r.flags if f != "no_image_path") or "none"
             lines.append(f"| {r.measurement_id} | {reasons} |")
         lines.append("")
 
@@ -402,7 +399,7 @@ def to_markdown_table(
         span = (
             str(first_row)
             if first_row == last_row
-            else f"{first_row}–{last_row}"
+            else f"{first_row} to {last_row}"
         )
         lines += [
             "## Pending rows",

@@ -27,7 +27,7 @@ _SAMPLE_EXPERIMENT_IMAGE = _SAMPLE_DIR / "experiment.JPG"
 _SAMPLE_MEASUREMENTS_CSV = _SAMPLE_DIR / "measurements_sample.csv"
 
 # Real pixel points (row 1 of the bundled measurements sample) for the object in
-# data/sample_images/experiment.JPG — used only to prefill the Estimation page demo so it
+# data/sample_images/experiment.JPG: used only to prefill the Estimation page demo so it
 # shows an accurate result with no interaction; the visitor can change them freely.
 _SAMPLE_WIDTH_POINTS = (1895.5, 2690.0, 2058.0, 2690.0)
 _SAMPLE_HEIGHT_POINTS = (1976.5, 2435.0, 1976.5, 2945.0)
@@ -60,14 +60,14 @@ def _sample_calibration_images() -> list[Path]:
 def _calibration_page() -> None:
     st.header("Camera Calibration")
     st.write(
-        "Calibrate the smartphone camera from chessboard photos. Follow "
-        "`docs/calibration_capture_protocol.md` first, and enter the **measured** square "
+        "Calibrate the smartphone camera from chessboard photos. Photograph a flat, printed "
+        "chessboard from varied angles and distances, and enter the **measured** square "
         "edge length (not the nominal print size)."
     )
 
     c1, c2, c3 = st.columns(3)
-    cols = int(c1.number_input("Inner corners — columns", min_value=2, max_value=30, value=9))
-    rows = int(c2.number_input("Inner corners — rows", min_value=2, max_value=30, value=6))
+    cols = int(c1.number_input("Inner corners (columns)", min_value=2, max_value=30, value=9))
+    rows = int(c2.number_input("Inner corners (rows)", min_value=2, max_value=30, value=6))
     square_mm = float(
         c3.number_input(
             "Measured square edge (mm)", min_value=0.1, value=25.0, step=0.1, format="%.1f"
@@ -86,17 +86,17 @@ def _calibration_page() -> None:
         sample_paths = _sample_calibration_images()
         if not sample_paths:
             pending_experiment_banner(
-                "Upload 15–25 chessboard photos taken with your smartphone to run calibration."
+                "Upload 15 to 25 chessboard photos taken with your smartphone to run calibration."
             )
             return
         using_sample = True
         sources = [(p.name, p.read_bytes()) for p in sample_paths]
         bundled_sample_notice(
-            f"No photos uploaded — showing a live demo recalibration on {len(sources)} "
+            f"No photos uploaded: showing a live demo recalibration on {len(sources)} "
             "bundled real chessboard photos (a downscaled subset of the actual capture set). "
             "This recomputes K, distortion, and reprojection error live from these images, so "
-            "it differs slightly from the full 16-image submitted result in "
-            "`results/calibration_report.md`. Upload your own photos to override."
+            "it differs slightly from the full 16-image submitted calibration. Upload your "
+            "own photos to override."
         )
 
     grays: list[np.ndarray] = []
@@ -106,7 +106,7 @@ def _calibration_page() -> None:
         try:
             bgr = decode_image_bgr(data)
         except ValueError:
-            st.warning(f"{name}: could not decode as an image — skipped.")
+            st.warning(f"{name}: could not decode as an image; skipped.")
             continue
         gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
         corners = calib.find_chessboard_corners(gray, pattern_size)
@@ -123,13 +123,13 @@ def _calibration_page() -> None:
                 vis = calib.draw_corners(bgr, corners, pattern_size)
                 st.image(
                     cv2.cvtColor(vis, cv2.COLOR_BGR2RGB),
-                    caption=f"{name} — detected",
+                    caption=f"{name}: detected",
                     use_container_width=True,
                 )
             else:
                 st.image(
                     cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB),
-                    caption=f"{name} — NOT detected",
+                    caption=f"{name}: NOT detected",
                     use_container_width=True,
                 )
 
@@ -178,7 +178,7 @@ def _calibration_page() -> None:
 def _point_inputs(label: str, defaults: tuple[float, float, float, float]) -> tuple[
     tuple[float, float], tuple[float, float]
 ]:
-    st.markdown(f"**{label}** — two endpoint pixels")
+    st.markdown(f"**{label}**: two endpoint pixels")
     c1, c2, c3, c4 = st.columns(4)
     x1 = c1.number_input(f"{label} p1 x", value=float(defaults[0]), key=f"{label}_x1")
     y1 = c2.number_input(f"{label} p1 y", value=float(defaults[1]), key=f"{label}_y1")
@@ -192,7 +192,8 @@ def _estimation_page() -> None:
     st.write(
         "Estimate an object's real-world width and height by back-projecting user-selected "
         "pixel points onto a fronto-parallel plane at the measured optical-axis depth. "
-        "See `docs/assumptions.md`. No automatic object detection — you supply the points."
+        "The object is assumed to lie flat, parallel to the image plane, at the measured "
+        "depth. No automatic object detection: you supply the points."
     )
 
     image_file = st.file_uploader("Object image (raw, undistorted-free)", type=_IMAGE_TYPES)
@@ -219,7 +220,7 @@ def _estimation_page() -> None:
         default_width_pts = _SAMPLE_WIDTH_POINTS
         default_height_pts = _SAMPLE_HEIGHT_POINTS
         bundled_sample_notice(
-            "No upload — showing a live demo on one bundled real photo and the real "
+            "No upload: showing a live demo on one bundled real photo and the real "
             "16-image submitted calibration.json, with the points pre-filled at the actual "
             "measured location. Upload your own image and calibration.json to override."
         )
@@ -289,7 +290,7 @@ def _validation_page() -> None:
     st.header("Validation Analysis")
     st.write(
         "Analyse the 20-trial measurement CSV: per-row errors plus width / height / combined "
-        "statistics. See `docs/validation_protocol.md`. Rows with object-plane depth "
+        "statistics. Rows with object-plane depth "
         "≤ 2 m, non-positive ground truth, or missing points are rejected."
     )
 
@@ -307,9 +308,9 @@ def _validation_page() -> None:
         rows = parse_measurements_text(_SAMPLE_MEASUREMENTS_CSV.read_text(encoding="utf-8"))
         calibration = calib.load_calibration(_SAMPLE_CALIBRATION_JSON)
         bundled_sample_notice(
-            "No upload — showing 5 real rows from the actual 20-trial measurement set (a "
+            "No upload: showing 5 real rows from the actual 20-trial measurement set (a "
             "bundled subset) against the real submitted calibration.json. The full 20-row "
-            "result is in `results/validation_summary.md`. Upload your own CSV and "
+            "result is part of the submitted report. Upload your own CSV and "
             "calibration.json to override."
         )
     else:
@@ -323,7 +324,7 @@ def _validation_page() -> None:
 
     if not summary.rows:
         st.warning(
-            "No rows passed the acceptance rules yet — the template is empty or every row "
+            "No rows passed the acceptance rules yet: the template is empty or every row "
             "was rejected."
         )
     else:
@@ -374,10 +375,10 @@ def _validation_page() -> None:
     if summary.rejected:
         with st.expander(f"Rejected rows ({len(summary.rejected)})", expanded=not summary.rows):
             for r in summary.rejected:
-                reasons = ", ".join(f for f in r.flags if f != "no_image_path") or "—"
-                st.write(f"**{r.measurement_id}** — {reasons}")
+                reasons = ", ".join(f for f in r.flags if f != "no_image_path") or "none"
+                st.write(f"**{r.measurement_id}**: {reasons}")
 
-    with st.expander("validation_summary.md preview"):
+    with st.expander("Validation summary preview"):
         st.markdown(to_markdown_table(summary))
 
 
@@ -385,9 +386,9 @@ def _theory_page() -> None:
     st.header("Two-Camera Projection Theory")
     doc = _DOCS_DIR / "theory_two_camera_projection.md"
     if not doc.is_file():
-        st.error(f"Theory document not found: {doc}")
+        st.error("The two-camera projection derivation is not available.")
         return
-    st.caption(f"Source: `docs/{doc.name}`")
+    st.caption("Written derivation for the two-camera projection question.")
     st.markdown(doc.read_text(encoding="utf-8"))
 
 

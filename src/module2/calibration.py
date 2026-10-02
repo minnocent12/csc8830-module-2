@@ -150,7 +150,7 @@ def compute_reprojection_error(
     n_views = len(object_points)
     if not (len(image_points) == len(rvecs) == len(tvecs) == n_views):
         raise ValueError(
-            "compute_reprojection_error: mismatched input lengths — "
+            "compute_reprojection_error: mismatched input lengths: "
             f"object_points={n_views}, image_points={len(image_points)}, "
             f"rvecs={len(rvecs)}, tvecs={len(tvecs)}; every view must have all four."
         )
@@ -201,7 +201,7 @@ def calibrate(
     """
     if not (len(image_points) == len(names) == len(object_points)):
         raise ValueError(
-            "calibrate: mismatched input lengths — "
+            "calibrate: mismatched input lengths: "
             f"object_points={len(object_points)}, image_points={len(image_points)}, "
             f"names={len(names)}; used_images/num_images must describe exactly the "
             "calibrated views."
