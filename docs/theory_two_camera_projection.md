@@ -1,4 +1,4 @@
-# Two-camera projection — relationship between the image coordinates of one 3D point
+# Two-camera projection: relationship between the image coordinates of one 3D point
 
 ## 0. Problem statement
 
@@ -17,13 +17,13 @@ assumptions.
 | World $\{W\}$ | arbitrary fixed point | right-handed | $P = (X, Y, Z)^\top$, homogeneous $\tilde P = (X, Y, Z, 1)^\top$ |
 | Camera 1 $\{C_1\}$ | Camera 1 optical centre | $z$ along the optical axis into the scene, $x$ right, $y$ down (OpenCV) | $P_1 = R_1 P + t_1$ |
 | Camera 2 $\{C_2\}$ | Camera 2 optical centre | same conventions | $P_2 = R_2 P + t_2$ |
-| Image $i$ | top-left pixel | $u$ right, $v$ down | $(u_i, v_i)$ — ordinary pixel coordinates |
+| Image $i$ | top-left pixel | $u$ right, $v$ down | $(u_i, v_i)$, ordinary pixel coordinates |
 
 $(u_i, v_i)$ are **ordinary image pixel coordinates**: the origin is the **image origin
 (top-left pixel)** and $v$ increases downward. The principal point $(c_x, c_y)$ is **not the
-coordinate origin** — it enters only as the offset added by $K$ (§2).
+coordinate origin**; it enters only as the offset added by $K$ (§2).
 
-$(R_i, t_i)$ are the **extrinsics** of camera $i$ — the pose of the world frame expressed in
+$(R_i, t_i)$ are the **extrinsics** of camera $i$: the pose of the world frame expressed in
 that camera's frame. The *normalized image plane* of a camera is the plane $z = 1$ in its
 own frame; the intrinsic matrix $K$ (next section) maps normalized coordinates to pixels.
 
@@ -40,12 +40,12 @@ $$
 K = \begin{bmatrix} f_x & s & c_x \\ 0 & f_y & c_y \\ 0 & 0 & 1 \end{bmatrix}.
 $$
 
-* $f_x = f\,m_x$ and $f_y = f\,m_y$ — the focal length $f$ (in mm) times the pixel density
+* $f_x = f\,m_x$ and $f_y = f\,m_y$: the focal length $f$ (in mm) times the pixel density
   $m_x, m_y$ (px/mm) along each sensor axis, i.e. **focal length in pixels**. $f_x \neq f_y$
   when the pixels are not square.
-* $(c_x, c_y)$ — the **principal point**: the pixel where the optical axis pierces the
+* $(c_x, c_y)$ is the **principal point**: the pixel where the optical axis pierces the
   sensor, nominally the image centre.
-* $s$ — **skew**, non-zero only if the sensor axes are not perpendicular; $s \approx 0$ for
+* $s$ is the **skew**, non-zero only if the sensor axes are not perpendicular; $s \approx 0$ for
   modern cameras.
 
 A normalized camera-frame point $\hat x = (X_c/Z_c,\ Y_c/Z_c,\ 1)^\top$ maps to the ordinary
@@ -57,7 +57,7 @@ the origin from the principal point to the top-left pixel.
 from many poses. Each view gives 3D→2D correspondences and a homography
 $H = K\,[\,r_1\ r_2\ t\,]$; the orthonormality of $r_1, r_2$ gives two linear constraints per
 view on $\omega = K^{-\top}K^{-1}$. Stacking $\ge 3$ views solves for $\omega$, hence $K$ by
-Cholesky factorization; a non-linear refinement (Levenberg–Marquardt) then minimizes the
+Cholesky factorization; a non-linear refinement (Levenberg-Marquardt) then minimizes the
 total reprojection error over $K$, the distortion coefficients, and every per-view
 $(R, t)$. This is precisely `cv2.calibrateCamera` (Module 2, Step 1), which also reports the
 RMS reprojection error as the accuracy figure.
@@ -74,10 +74,10 @@ $$
 \qquad \lambda_1 = (R_1 P + t_1)_z .
 $$
 
-$\lambda_1$ is the **depth** of $P$ along Camera 1's optical axis — the scale discarded by
+$\lambda_1$ is the **depth** of $P$ along Camera 1's optical axis: the scale discarded by
 the perspective division $x = X_c/Z_c$.
 
-**Reference-frame choice — why $R_1 = I$, $t_1 = 0$ is free.** The world frame is arbitrary,
+**Reference-frame choice: why $R_1 = I$, $t_1 = 0$ is free.** The world frame is arbitrary,
 so we may *define* it to coincide with $\{C_1\}$. Then the pose of the world in Camera 1 is
 the identity. This is a choice of coordinates, not a claim about the scene, and it loses no
 generality: any other world frame differs from $\{C_1\}$ by a fixed rigid transform that is
@@ -91,7 +91,7 @@ $$
 
 In code, $\hat x_1$ is produced **directly** by `cv2.undistortPoints(pts, K, dist, P=None)`;
 its output is already $K_1^{-1}$-applied (and distortion-corrected), so $K_1^{-1}$ must not
-be applied to it again — see assumption 2.
+be applied to it again (see assumption 2).
 
 ---
 
@@ -103,7 +103,7 @@ $$
 \boxed{\,P_2 = R\,P_1 + t\,}.
 $$
 
-* $R \in SO(3)$ is the **relative rotation** — it encodes Camera 2's oblique orientation
+* $R \in SO(3)$ is the **relative rotation**; it encodes Camera 2's oblique orientation
   (yaw / pitch / roll away from Camera 1's axes). The columns of $R^\top$ are Camera 1's
   axes as seen from Camera 2.
 * $t \in \mathbb{R}^3$ is the origin of $\{C_1\}$ expressed in $\{C_2\}$. The Camera 2 →
@@ -130,14 +130,14 @@ $$
 
 ### 6.1 There is no point-to-point map without depth
 
-From §3, $P_1 = Z\,\hat x_1$ with $Z$ unknown from Camera 1 alone. Substituting into §4–5:
+From §3, $P_1 = Z\,\hat x_1$ with $Z$ unknown from Camera 1 alone. Substituting into §4-5:
 
 $$
 \lambda_2\,\hat x_2 = R\,(Z\,\hat x_1) + t = Z\,R\,\hat x_1 + t .
 $$
 
 For a fixed $(u_1, v_1)$ the world point may lie anywhere on the ray
-$\{Z\,\hat x_1 : Z > 0\}$; its image in Camera 2 sweeps a **line** — the *epipolar line* —
+$\{Z\,\hat x_1 : Z > 0\}$; its image in Camera 2 sweeps a **line**, the *epipolar line*,
 not a single point. Pinning down $(u_2, v_2)$ needs the extra scalar $Z$.
 
 ### 6.2 Epipolar constraint → essential matrix (calibrated cameras)
@@ -162,7 +162,7 @@ $$
 $$
 
 $E$ has rank 2, its two non-zero singular values are equal, and it has 5 degrees of freedom
-(3 for $R$, 2 for the *direction* of $t$ — the overall scale of $t$ is unobservable from
+(3 for $R$, 2 for the *direction* of $t$; the overall scale of $t$ is unobservable from
 images).
 
 ### 6.3 Pixel form → fundamental matrix
@@ -184,8 +184,8 @@ $$
 
 $F$ sends a point in image 1 to its **epipolar line** in image 2, $\ell_2 = F x_1$ (with
 $x_2^\top \ell_2 = 0$), and $\ell_1 = F^\top x_2$ in the other direction. $F$ has rank 2 and
-7 DoF (9 entries, minus scale, minus $\det F = 0$). The **epipoles** — the image of each
-camera's centre in the other view — satisfy $F e_1 = 0$ and $F^\top e_2 = 0$, with
+7 DoF (9 entries, minus scale, minus $\det F = 0$). The **epipoles** (the image of each
+camera's centre in the other view) satisfy $F e_1 = 0$ and $F^\top e_2 = 0$, with
 $e_1 \simeq K_1(-R^\top t)$ and $e_2 \simeq K_2\, t$.
 
 ### 6.4 Recovering the actual corresponding point (supply the depth)
@@ -197,7 +197,7 @@ $e_1 \simeq K_1(-R^\top t)$ and $e_2 \simeq K_2\, t$.
    2 unknowns $Z, \lambda_2$ in least squares, then project as in (1).
 3. **Plane-induced homography:** if $P$ lies on a known plane $\hat n^\top P_1 = d$ in
    $\{C_1\}$, then $x_2 \simeq H x_1$ with
-   $H = K_2\big(R + t\,\hat n^\top/d\big) K_1^{-1}$ — a true point-to-point map, valid only
+   $H = K_2\big(R + t\,\hat n^\top/d\big) K_1^{-1}$, a true point-to-point map, valid only
    for points on that plane.
 
 ### 6.5 How $R$ and $t$ govern the relationship
@@ -221,8 +221,8 @@ $e_1 \simeq K_1(-R^\top t)$ and $e_2 \simeq K_2\, t$.
   ($P_2 = R(P_1 - C_2)$, giving $X_2 = X_1 - b$); the two conventions must not be mixed. The
   only residual unknown is the single scalar $Z$.
 * **General oblique $(R, t)$:** $R$ rotates each back-projected ray and $t$ offsets the
-  centre; together they fix the epipolar geometry ($E$, $F$) — hence the epipolar line each
-  point is confined to — while $\lVert t \rVert$ sets the metric scale of any triangulated
+  centre; together they fix the epipolar geometry ($E$, $F$), hence the epipolar line each
+  point is confined to, while $\lVert t \rVert$ sets the metric scale of any triangulated
   depth.
 
 ---
@@ -256,13 +256,13 @@ $e_1 \simeq K_1(-R^\top t)$ and $e_2 \simeq K_2\, t$.
    exactly because lens distortion has been removed with the calibrated coefficients. In
    Module 2 the normalized calibrated point $\hat x$ is obtained **directly** from
    `cv2.undistortPoints(pts, K, dist, P=None)`: with **`P=None` this call returns normalized
-   camera coordinates** on the $z = 1$ plane — distortion is already removed *and* $K^{-1}$
+   camera coordinates** on the $z = 1$ plane: distortion is already removed *and* $K^{-1}$
    has effectively already been applied, so **$K^{-1}$ must not be applied again** to its
-   output (this matches `src/module2/geometry.py`). The alternative form
+   output (this matches the dimension-estimation implementation). The alternative form
    `cv2.undistortPoints(pts, K, dist, P=K)` instead returns *undistorted pixel* coordinates
-   $(u, v)$ — to which $K^{-1}$ would still have to be applied — and is **not the canonical
+   $(u, v)$ (to which $K^{-1}$ would still have to be applied) and is **not the canonical
    Module 2 path**.
-3. **Camera 1 is the reference frame** ($R_1 = I$, $t_1 = 0$) — a coordinate choice, fully
+3. **Camera 1 is the reference frame** ($R_1 = I$, $t_1 = 0$): a coordinate choice, fully
    general (§3).
 4. **Intrinsics constant.** $K_1, K_2$ and the distortion do not change between calibration
    and capture: same lens, fixed focus and zoom, same resolution (Module 2 capture
@@ -273,13 +273,13 @@ $e_1 \simeq K_1(-R^\top t)$ and $e_2 \simeq K_2\, t$.
 6. **$P$ is static and visible in both images**, so $(u_1, v_1)$ and $(u_2, v_2)$ are images
    of the *same* world point.
 7. **Negligible motion blur.** If the two exposures are not simultaneous, the scene is
-   stationary — equivalent for a static point.
+   stationary, equivalent for a static point.
 8. **Consistent metric scale.** Both cameras are calibrated in the same physical units
    (mm), so lengths and $\lVert t \rVert$ are comparable.
 
 ---
 
-## 9. Illustrative numerical example (synthetic — *not* measured data)
+## 9. Illustrative numerical example (synthetic, *not* measured data)
 
 *Chosen to make the algebra concrete; these are not experimental values.*
 

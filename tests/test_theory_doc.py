@@ -101,7 +101,22 @@ def test_undistortpoints_convention_is_explicit(text: str) -> None:
     assert "returns normalized camera coordinates" in text
     assert "$K^{-1}$ must not be applied again" in text
     assert "not the canonical Module 2 path" in text
-    assert "src/module2/geometry.py" in text
+    # The doc is shown in the app, so it names the implementation in words, not by path;
+    # the claim itself is checked against the code: the call passes no P (or P=None).
+    assert "this matches the dimension-estimation implementation" in text
+    import ast
+    from pathlib import Path
+
+    geometry = Path(__file__).resolve().parents[1] / "src" / "module2" / "geometry.py"
+    calls = [
+        node for node in ast.walk(ast.parse(geometry.read_text(encoding="utf-8")))
+        if isinstance(node, ast.Call) and getattr(node.func, "attr", "") == "undistortPoints"
+    ]
+    assert calls
+    for call in calls:
+        p_keywords = [kw.value for kw in call.keywords if kw.arg == "P"]
+        assert len(call.args) <= 3
+        assert all(isinstance(v, ast.Constant) and v.value is None for v in p_keywords)
 
 
 def test_pure_translation_disparity_sign_is_positive_under_P2_convention(text: str) -> None:

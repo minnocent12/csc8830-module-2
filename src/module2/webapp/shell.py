@@ -11,6 +11,6 @@ from module2.webapp._page import PageSpec
 from module2.webapp.design.shell import render_shell
 
 
-def render_app(pages: Sequence[PageSpec], *, title: str = "CSc 8830 — Module 2") -> None:
+def render_app(pages: Sequence[PageSpec], *, title: str = "CSc 8830 - Module 2") -> None:
     """Render the standalone Module 2 app around the selected page."""
     render_shell(pages, page_title=title, standalone=True)
